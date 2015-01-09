@@ -22,9 +22,18 @@
 
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
+#include <stdio.h>
 
 /* FIXME: Define the type 'struct command_stream' here.  This should
    complete the incomplete type declaration in command.h.  */
+struct command_stream
+{
+	
+
+
+
+
+}
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),

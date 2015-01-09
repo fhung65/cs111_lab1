@@ -1,0 +1,24 @@
+Psuedo code/ notes:
+
+================================1/8/15===============
+command_stream
+{
+	char* buffer
+	int iterator = 0 // index of last char we read
+} 
+
+make_command_stream( function_t getbyte, arg ):
+	while no error in getting character:
+		get a character
+		resize buffer if needed
+		store character in buffer
+
+read_command:
+	notes:
+		read chars from stream into buffer
+			stop at a valid point or syntax err
+		when we can identify a full command
+			create struct
+
+
+	-talked about recursion and pipes
