@@ -22,3 +22,102 @@ read_command:
 
 
 	-talked about recursion and pipes
+
+====1/9/15============================================
+some notes on grammar
+syntax:
+	comment:
+		- # allowable chars \n
+	whitespace(spc):
+		- [space, tab, newline] (check on newline?)
+	word:
+		-sequence of non spc chars
+	simple command(sc):
+		- word spc
+		- word (excluding "if", "while", "until") spc sc
+	compount command(cpd)
+		- if cc then cc fi
+		- if cc then cc else cc fi
+		- while cc do cc done
+		- until cc do cc done
+	I/O redirect(red)
+		- [empty]
+		- < word
+		- > word
+		- < word > word
+	command(c)
+		- [sc, cpl, cpd, ss] red
+	pipelines(pip): 
+		- c
+		- c | (pip) 
+	complete command(cpl):
+		- pip ;
+		- pip \n
+		- cpl cpl (maybe?)
+	subshell(ss):
+		- ( cpl )
+
+
+
+example----------
+ex)
+echo "Stars"
+i=0
+while( i<=5 )
+do
+	j=0
+    while( j<=i )
+    do
+     echo -n " *"
+	j++
+    done
+    echo ""
+	i++
+done
+
+note: this ex) is a little shitty cause of the vars, but treat "var=val" as a single word for now, also I left out spc's below, cause we'll maybe just eat them up when we build words and stuff
+
+cpl
+	cpl
+		pip
+			c
+				sc
+					word( excluding logical)
+						echo
+					word
+						"Stars"
+			red
+				[empty]
+	cpl
+		pip
+			c
+				sc
+					i=o
+				red
+					[empty]
+	cpl
+		pip
+			c
+				cpd
+					while
+					cpl
+						pip
+							c
+								ss
+									(
+									cpl
+										pip
+											sc
+												word
+													i<=5
+												red
+													[empty]
+									)
+					do
+						...
+				red
+					[empty]
+	...
+
+
+--------
