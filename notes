@@ -1,4 +1,6 @@
-Psuedo code/ notes:
+Psuedo code/ notes: 
+Disclaimer: most of this is to help me think
+	a lot of it probably might not be exactly implemented
 
 ================================1/8/15===============
 command_stream
@@ -121,3 +123,129 @@ cpl
 
 
 --------
+
+===================1/10/15=================================================
+very rough psuedocode
+
+void append_to_token( char c, char* token )
+{
+	if token is non null
+		if 
+
+
+}
+
+// puts a bunch of tokens in cstrings into the command stream
+make_command_stream( function_t getbyte, getbyte_arg)
+{
+	char c
+	int max_size = 10
+	int cur_size = 0
+	char* token = (char*) malloc( max_size ) // token is a cstring
+	while( getting a byte into c returns valid )
+	{
+		switch c // might not actually be a switch statement later
+		case [a-zA-Z0-9!%+,-./:@^_]
+			if
+				append to token, resize if needed
+			break
+		case [space or tab]			
+			if prev was a space 
+				ignore  ?
+			else
+				close the previous token
+				put it in the stream
+				make a new token
+			break
+// i think it's worth it to make \n a token ? cause it's significant in the syntax
+		case [\n] 
+			if the previous was \n ignore 
+			// fall through
+		case [;]
+		case [|] 
+		case [(]
+		case [)]
+		case [<]	
+		case [>]
+		case [#]
+			close the prev token(put in  a \0 char)
+			put it in the stream
+			put c in a new token, close it
+			put that in the stream too
+			make a new token
+			break		
+	}
+
+	return the stream
+}
+
+// before this is called, s is a collection of c strings, each of which is one of
+// [ word ][ \n ][ ; ][ | ][ ( ][ ) ][ < ][ > ]
+// I'm gonna go with a shift-reduce implementation for now
+// works like this: shift a token into dostuff region, reduce dostuff region, repeat
+read_command_stream( command_stream_t s )
+{
+	command* divider // points to second element (index 1) @ start
+	command* top // points to the top of command tree
+	command* base[ 5 ] // 5 for now, pointer to top of scope 
+		// base[0] may replace top
+	while divider isn't the end
+	{
+		// first look at new token to the left of divider that we just put on
+		if ( word -> first char is a wordcharacter )
+		{
+			if ( it matches a logical word )
+			{
+				if ( immediate left of this token is ';' or '\n' )
+				{
+					make a new command
+					point u.command[1] of the sequence command assoc. with
+						the ';' or '\n' at this command ( I think it'll be top )
+					
+				}
+				else
+				{
+					// do nothing, fall through and continue
+				}
+		 
+			}
+			---- this is for nonlogical words
+			if ( immediate left command is simple command )
+			{
+				concat this token onto the word of that command
+			}
+			else
+			{
+				make a new simple command
+				put this token into the word of that command
+			}
+			----
+		}
+		
+
+
+		move the divider right one command
+	}	
+	
+}
+
+reduce_stack( stack_t stack )
+{
+	command* top
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

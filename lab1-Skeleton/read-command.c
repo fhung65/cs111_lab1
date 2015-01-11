@@ -26,14 +26,14 @@
 
 /* FIXME: Define the type 'struct command_stream' here.  This should
    complete the incomplete type declaration in command.h.  */
+
+/* A collection of tokens */
 struct command_stream
 {
-	
+	int size ;
+	char* tokens [ size ] ;
+};
 
-
-
-
-}
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
@@ -42,9 +42,62 @@ make_command_stream (int (*get_next_byte) (void *),
   /* FIXME: Replace this with your implementation.  You may need to
      add auxiliary functions and otherwise modify the source code.
      You can also use external functions defined in the GNU C Library.  */
+	char c = '\0' ;
+	char prev = c ;
+	int max_size = 10 ; 
+	int current = 0 ;
+	char* token = ( char* ) malloc( max_size * sizeof( char* ) ) ;
+
+	do{
+		
+		if(	( ( c >= 'a' ) && ( c <= 'z' ) ) ||
+			( ( c >= 'A' ) && ( c <= 'Z' ) ) ||
+			( ( c >= '0' ) && ( c <= '9' ) ) ||
+			( c == '!' ) ||
+			( c == '%' ) ||
+			( c == '+' ) ||
+			( c == ',' ) ||
+			( c == '-' ) ||
+			( c == '.' ) ||
+			( c == '/' ) ||
+			( c == ':' ) ||
+			( c == '@' ) ||
+			( c == '^' ) ||
+			( c == '_' ) )
+		{	
+			// TODO: append to token	
+		}
+		else if ( ( c == ' ' ) || ( c == '\t' ) )
+		{
+			if( ( prev == ' ' ) || ( prev == '\t' ) ) 
+				continue ;
+			else
+				// TODO: close last token with \0, put it in stream, make new token 
+		}
+		else if ( ( c == '\n') || ( c == ';' ) || ( c == '|' ) || ( c == '(' ) ||
+				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ) || ( c == '#' ) )
+		{
+			if( ( c == '\n' ) && ( prev == '\n' ) )
+				continue;
+			else
+				// TODO: close last token, put it in the stream,
+				// put c in a new token and put it in the stream
+				// make a new token
+		}
+		else // nonvalid character ( double check that this only means exit now)
+		{
+			// TODO: exit with error
+		}
+		
+		prev = c ;
+		c = get_next_byte( get_next_byte_argument ) ;
+
+	}   while( c != EOF )
+	
   error (1, 0, "command reading not yet implemented");
   return 0;
 }
+
 
 command_t
 read_command_stream (command_stream_t s)
