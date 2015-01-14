@@ -34,6 +34,8 @@ struct command_stream
 	char** tokens;
 };
 
+typedef struct command_stream *command_stream_t;
+
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
@@ -49,10 +51,10 @@ make_command_stream (int (*get_next_byte) (void *),
 	stream->size = 0;
 	stream->tokens = (char**) malloc(streamsize*sizeof(char**));
 	int stream_iter = 0;
+	int tstart = 1;
 
 	c = get_next_byte(get_next_byte_argument);
 	do{
-		printf("%c", c);
 		if(	( ( c >= 'a' ) && ( c <= 'z' ) ) ||
 			( ( c >= 'A' ) && ( c <= 'Z' ) ) ||
 			( ( c >= '0' ) && ( c <= '9' ) ) ||
@@ -70,9 +72,29 @@ make_command_stream (int (*get_next_byte) (void *),
 		{	
 			token[current] = c;
 			current++;
+			tstart = 0;
 			if(current == max_size) {
 				token = (char*) realloc(token, (max_size+10)*sizeof(char*));
 				max_size += 10;
+			}
+		}
+		else if (c == '#'){
+			if(tstart == 0){
+				token[current] = '\0';
+				stream->tokens[stream_iter] = token;
+				stream->size++;
+				stream_iter++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+				}
+				current = 0;
+				max_size = 10;
+				token = (char*) malloc(max_size*sizeof(char*));
+				tstart = 1;
+			}
+			while(c != '\n'){
+				c = get_next_byte(get_next_byte_argument);
 			}
 		}
 		else if ( ( c == ' ' ) || ( c == '\t' ) )
@@ -80,37 +102,40 @@ make_command_stream (int (*get_next_byte) (void *),
 			if( ( prev == ' ' ) || ( prev == '\t' ) ) ;
 				//continue ;
 			else{
-				token[current] = '\0';
-				stream->tokens[stream_iter] = token;
-				stream->size++;
-				stream_iter++;
-				if(stream_iter >= streamsize){
-					streamsize += 10;
-					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+				if(tstart = 0){
+					token[current] = '\0';
+					stream->tokens[stream_iter] = token;
+					stream->size++;
+					stream_iter++;
+					if(stream_iter >= streamsize){
+						streamsize += 10;
+						stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+					}
+					current = 0;
+					max_size = 10;
+					token = (char*) malloc(max_size*sizeof(char*)); //Like this?
+					tstart =1;
 				}
-				current = 0;
-				max_size = 10;
-				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
-				
 			}
 		}
 		else if ( ( c == '\n') || ( c == ';' ) || ( c == '|' ) || ( c == '(' ) ||
-				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ) || ( c == '#' ))
+				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ))
 		{
-			//if( ( c == '\n' ) && ( prev == '\n' ) );
-				//continue;
-			//else{
-				token[current] = '\0';
-				stream->tokens[stream_iter] = token;
-				stream->size++;
-				stream_iter++;
-				if(stream_iter >= streamsize){
-					streamsize += 10;
-					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+			else{
+				if(tstart = 0){
+					token[current] = '\0';
+					stream->tokens[stream_iter] = token;
+					stream->size++;
+					stream_iter++;
+					if(stream_iter >= streamsize){
+						streamsize += 10;
+						stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+					}
+					current = 0;
+					max_size = 10;
+					token = (char*) malloc(2*sizeof(char*)); //Like this?
+					tstart =1;
 				}
-				current = 0;
-				max_size = 10;
-				token = (char*) malloc(2*sizeof(char*)); //Like this?
 				
 				token[0] = c;
 				token[1] = '\0';
@@ -124,13 +149,12 @@ make_command_stream (int (*get_next_byte) (void *),
 				
 				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
 				
-				//}
+				}
 		}
 		else // nonvalid character ( double check that this only means exit now)
 		{
 			// TODO: exit with error
-			//error(2,0, "syntax error"); //or other message?
-			printf("%s\n", "Syntax Error");
+			error(2,errno, "syntax error"); //or other message?
 			exit(EXIT_FAILURE);
 		}
 		
