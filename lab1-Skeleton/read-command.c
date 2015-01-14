@@ -33,26 +33,31 @@ struct command_stream
 {
 	int size ;
 	int div ; // the index of next command to be read
+	int line_num ;
 	char** tok ; // and array of tokens (c strings)
 };
+
+typedef struct command_stream *command_stream_t;
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
-	char c = '\0';
-	char prev = c ;
+	char c = '\0' ;
+	char prev = c;
+	
 	int max_size = 10 ; 
 	int current = 0 ;
-//	char* token = ( char* ) malloc( max_size * sizeof( char* ) ) ;
-
+	char* token = ( char* ) malloc( max_size * sizeof( char* ) ) ;
+	command_stream_t stream = (command_stream_t) malloc(max_size*sizeof(command_stream_t));
+	int streamsize = 10;
+	stream->size = 0;
+	stream->div = 0 ;
+	stream->tok = (char**) malloc(streamsize*sizeof(char**));
+	int stream_iter = 0;
+	int tstart = 1;
+	c = get_next_byte(get_next_byte_argument);
 	do{
-		prev = c ;
-		c = get_next_byte( get_next_byte_argument ) ;
-		
 		if(	( ( c >= 'a' ) && ( c <= 'z' ) ) ||
 			( ( c >= 'A' ) && ( c <= 'Z' ) ) ||
 			( ( c >= '0' ) && ( c <= '9' ) ) ||
@@ -68,36 +73,99 @@ make_command_stream (int (*get_next_byte) (void *),
 			( c == '^' ) ||
 			( c == '_' ) )
 		{	
-			// TODO: append to token	
+			token[current] = c;
+			current++;
+			tstart = 0;
+			if(current == max_size) {
+				token = (char*) realloc(token, (max_size+10)*sizeof(char*));
+				max_size += 10;
+			}
+		}
+		else if (c == '#'){
+			if(tstart == 0){
+				token[current] = '\0';
+				stream->tok[stream_iter] = token;
+				stream->size++;
+				stream_iter++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tok = (char**) realloc(stream->tok, (streamsize)*sizeof(char**));
+				}
+				current = 0;
+				max_size = 10;
+				token = (char*) malloc(max_size*sizeof(char*));
+				tstart = 1;
+			}
+			while(c != '\n' || c == EOF ){
+				c = get_next_byte(get_next_byte_argument);
+			}
 		}
 		else if ( ( c == ' ' ) || ( c == '\t' ) )
 		{
-			if( ( prev == ' ' ) || ( prev == '\t' ) ) 
-				continue ;
-			else
-			{}	// TODO: close last token with \0, put it in stream, make new token 
+			if( ( prev == ' ' ) || ( prev == '\t' ) ) ;
+				//continue ;
+			else{
+				if(tstart == 0){
+					token[current] = '\0';
+					stream->tok[stream_iter] = token;
+					stream->size++;
+					stream_iter++;
+					if(stream_iter >= streamsize){
+						streamsize += 10;
+						stream->tok = (char**) realloc(stream->tok, (streamsize)*sizeof(char**));
+					}
+					current = 0;
+					max_size = 10;
+					token = (char*) malloc(max_size*sizeof(char*)); //Like this?
+					tstart =1;
+				}
+			}
 		}
 		else if ( ( c == '\n') || ( c == ';' ) || ( c == '|' ) || ( c == '(' ) ||
-				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ) || ( c == '#' ) )
+				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ))
 		{
-			if( ( c == '\n' ) && ( prev == '\n' ) )
-				continue;
-			else{
-				// TODO: close last token, put it in the stream,
-				// put c in a new token and put it in the stream
-				// make a new token
+				if(tstart == 0){
+					token[current] = '\0';
+					stream->tok[stream_iter] = token;
+					stream->size++;
+					stream_iter++;
+					if(stream_iter >= streamsize){
+						streamsize += 10;
+						stream->tok = (char**) realloc(stream->tok, (streamsize)*sizeof(char**));
+					}
+					current = 0;
+					max_size = 10;
+					token = (char*) malloc(2*sizeof(char*)); //Like this?
+					tstart =1;
 				}
+				
+				token[0] = c;
+				token[1] = '\0';
+				stream->tok[stream_iter] = token;
+				stream_iter++;
+				stream->size++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tok = (char**) realloc(stream->tok, (streamsize)*sizeof(char**));
+				}
+				
+				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
+				
 		}
 		else // nonvalid character ( double check that this only means exit now)
 		{
 			// TODO: exit with error
+			error(2, 0 , "syntax error"); //or other message?
+			exit(EXIT_FAILURE);
 		}
 		
 
-	}   while( c != EOF ) ;
+	}   while( c != EOF );
+	token[current] = '\0';
+	stream->tok[stream_iter] = token;
+	stream->size++;
 	
-  //error (1, 0, "command reading not yet implemented");
-  return 0;
+  return stream;
 }
 
 void add_word( char** arr, char* word )
@@ -165,7 +233,7 @@ void push_base( command_t cmd , command_t* base , int* scope, int* size )
 		exit(1) ;
 	}
 
-	*scope ++;
+	(*scope)++ ;
 	if( *scope >= *size )
 	{
 		*size += *size ;
@@ -207,7 +275,7 @@ command_t pop_base( command_t* base , int* scope )
 			slot ++ ; 
 		}
 		base[*scope-1]->u.command[slot] = temp ;
-		*scope -- ;
+		(*scope)-- ;
 	}
 	else if( *scope == 0 )
 		fprintf( stderr, "in pop_base: called while scope == 0\n") ;
@@ -238,13 +306,14 @@ read_command_stream (command_stream_t s)
 
 //	base[scope] is the current top of the subtree being built
 //	either null ( building ) or is a completed command
+	s->line_num = 0 ;
 	int size = 6 ;
 	int scope = 0 ;
 	command_t base[ size ] ; 
 	base[scope] = NULL ; // when base[scope] is null, we are ready to start a command
 	char* token = NULL ;
 
-	while( s->div < s->size ) 
+	for( ; s->div < s->size ; s->div ++  ) 
 	{
 		token = s->tok[s->div] ;
 		if( strcmp( token, "#" ) ) 
@@ -323,6 +392,7 @@ read_command_stream (command_stream_t s)
 		}
 		else if( strcmp(token, "\n") )
 		{
+			s->line_num ++ ;
 			if( base[scope] == NULL )
 			{
 				// it's been \n's since the start of this subtree, or 
@@ -393,26 +463,6 @@ read_command_stream (command_stream_t s)
 
 			printf("Invalid syntax! unexpected token near %s\n", token) ;
 			exit(1) ;
-	
-			//if( base[scope] == NULL )
-			//{ // syntax error
-			//	printf("Invalid syntax! unexpected token near %s\n", token) ;
-			//	exit(1) ;
-			//}
-			//else
-			//{
-			//	if( ( in && ( base[scope]->input != NULL) )
-			//		|| ( (!in) && ( base[scope]->output != NULL ) ) )
-			//	{ // syntax error there was already an input
-			//		printf("Invalid syntax! unexpected token near %s\n", token) ;
-			//		exit(1) ;
-			//	}
-			//	else
-			//	{
-			//		// get next token, if it's a word, chuck it in, else error
-			//		base[scope]->input 
-			//	}
-			//}
 		}
 //		otherwise, treat as word
 //		{
@@ -436,9 +486,41 @@ read_command_stream (command_stream_t s)
 
 
 	} // now s->divider >= s->size, or we've finished a command (\n\n)
+	
+	// done making command now, or reached end of stream
+	if( scope >= 1 )
+	{
+		if( scope == 1 && base[scope-1]->type == SEQUENCE_COMMAND ) 
+		{
+			pop_base( base, &scope ) ; // it's ok to pop a null
+			return base[scope] ;
+			//good to go
+		}
+		else
+		{ // syntax error
+			printf("Invalid syntax: terminated on incomplete command\n") ;
+			exit(1) ;
+		}
+	}
+	else if( scope == 0 )
+	{
+		if( base[scope] != NULL )
+		{ // good to go
+			return base[scope] ;
+		}
+		else
+		{
+			return 0 ; // return null command ( or false )
+		}
+	}
+	else if( scope < 0 )
+	{
+		printf("error in read_command_stream: terminated with negative scope\n") ;
+		exit(1) ;
+	}
 
-
-  return 0;
+	printf("should never have gotten here, but compiler's being a pain\n") ;
+	return 0 ;
 }
 
 //command_t
@@ -502,3 +584,25 @@ read_command_stream (command_stream_t s)
 //
 //  return 0;
 //}
+
+//////////////////////////////////////////////////separate matter below ( old token is word case )
+	
+			//if( base[scope] == NULL )
+			//{ // syntax error
+			//	printf("Invalid syntax! unexpected token near %s\n", token) ;
+			//	exit(1) ;
+			//}
+			//else
+			//{
+			//	if( ( in && ( base[scope]->input != NULL) )
+			//		|| ( (!in) && ( base[scope]->output != NULL ) ) )
+			//	{ // syntax error there was already an input
+			//		printf("Invalid syntax! unexpected token near %s\n", token) ;
+			//		exit(1) ;
+			//	}
+			//	else
+			//	{
+			//		// get next token, if it's a word, chuck it in, else error
+			//		base[scope]->input 
+			//	}
+			//}
