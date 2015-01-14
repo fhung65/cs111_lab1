@@ -30,26 +30,29 @@
 /* A collection of tokens */
 struct command_stream
 {
-	int size ;
-	char* tokens [ size ] ;
+	int size;
+	char** tokens;
 };
-
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
 	char c = '\0' ;
-	char prev = c ;
+	char prev = c;
+	
 	int max_size = 10 ; 
 	int current = 0 ;
 	char* token = ( char* ) malloc( max_size * sizeof( char* ) ) ;
+	command_stream_t stream = (command_stream_t) malloc(max_size*sizeof(command_stream_t));
+	int streamsize = 10;
+	stream->size = 0;
+	stream->tokens = (char**) malloc(streamsize*sizeof(char**));
+	int stream_iter = 0;
 
+	c = get_next_byte(get_next_byte_argument);
 	do{
-		
+		printf("%c", c);
 		if(	( ( c >= 'a' ) && ( c <= 'z' ) ) ||
 			( ( c >= 'A' ) && ( c <= 'Z' ) ) ||
 			( ( c >= '0' ) && ( c <= '9' ) ) ||
@@ -65,37 +68,81 @@ make_command_stream (int (*get_next_byte) (void *),
 			( c == '^' ) ||
 			( c == '_' ) )
 		{	
-			// TODO: append to token	
+			token[current] = c;
+			current++;
+			if(current == max_size) {
+				token = (char*) realloc(token, (max_size+10)*sizeof(char*));
+				max_size += 10;
+			}
 		}
 		else if ( ( c == ' ' ) || ( c == '\t' ) )
 		{
-			if( ( prev == ' ' ) || ( prev == '\t' ) ) 
-				continue ;
-			else
-				// TODO: close last token with \0, put it in stream, make new token 
+			if( ( prev == ' ' ) || ( prev == '\t' ) ) ;
+				//continue ;
+			else{
+				token[current] = '\0';
+				stream->tokens[stream_iter] = token;
+				stream->size++;
+				stream_iter++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+				}
+				current = 0;
+				max_size = 10;
+				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
+				
+			}
 		}
 		else if ( ( c == '\n') || ( c == ';' ) || ( c == '|' ) || ( c == '(' ) ||
-				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ) || ( c == '#' ) )
+				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ) || ( c == '#' ))
 		{
-			if( ( c == '\n' ) && ( prev == '\n' ) )
-				continue;
-			else
-				// TODO: close last token, put it in the stream,
-				// put c in a new token and put it in the stream
-				// make a new token
+			//if( ( c == '\n' ) && ( prev == '\n' ) );
+				//continue;
+			//else{
+				token[current] = '\0';
+				stream->tokens[stream_iter] = token;
+				stream->size++;
+				stream_iter++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+				}
+				current = 0;
+				max_size = 10;
+				token = (char*) malloc(2*sizeof(char*)); //Like this?
+				
+				token[0] = c;
+				token[1] = '\0';
+				stream->tokens[stream_iter] = token;
+				stream_iter++;
+				stream->size++;
+				if(stream_iter >= streamsize){
+					streamsize += 10;
+					stream->tokens = (char**) realloc(stream->tokens, (streamsize)*sizeof(char**));
+				}
+				
+				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
+				
+				//}
 		}
 		else // nonvalid character ( double check that this only means exit now)
 		{
 			// TODO: exit with error
+			//error(2,0, "syntax error"); //or other message?
+			printf("%s\n", "Syntax Error");
+			exit(EXIT_FAILURE);
 		}
 		
 		prev = c ;
 		c = get_next_byte( get_next_byte_argument ) ;
 
-	}   while( c != EOF )
+	}   while( c != EOF );
+	token[current] = '\0';
+	stream->tokens[stream_iter] = token;
+	stream->size++;
 	
-  error (1, 0, "command reading not yet implemented");
-  return 0;
+  return stream;
 }
 
 
