@@ -102,7 +102,7 @@ make_command_stream (int (*get_next_byte) (void *),
 			if( ( prev == ' ' ) || ( prev == '\t' ) ) ;
 				//continue ;
 			else{
-				if(tstart = 0){
+				if(tstart == 0){
 					token[current] = '\0';
 					stream->tokens[stream_iter] = token;
 					stream->size++;
@@ -121,8 +121,8 @@ make_command_stream (int (*get_next_byte) (void *),
 		else if ( ( c == '\n') || ( c == ';' ) || ( c == '|' ) || ( c == '(' ) ||
 				  ( c == ')' ) || ( c == '<' ) || ( c == '>' ))
 		{
-			else{
-				if(tstart = 0){
+			
+				if(tstart == 0){
 					token[current] = '\0';
 					stream->tokens[stream_iter] = token;
 					stream->size++;
@@ -149,7 +149,7 @@ make_command_stream (int (*get_next_byte) (void *),
 				
 				token = (char*) malloc(max_size*sizeof(char*)); //Like this?
 				
-				}
+				
 		}
 		else // nonvalid character ( double check that this only means exit now)
 		{
