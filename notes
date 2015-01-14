@@ -186,29 +186,54 @@ make_command_stream( function_t getbyte, getbyte_arg)
 read_command_stream( command_stream_t s )
 {
 	command* divider // points to second element (index 1) @ start
-	command* top // points to the top of command tree
+->	command* top // points to the top of command tree
+	int scope = 0 // where we are in base[]
 	command* base[ 5 ] // 5 for now, pointer to top of scope 
 		// base[0] may replace top
+	int cond = 0
+
 	while divider isn't the end
 	{
 		// first look at new token to the left of divider that we just put on
 		if ( word -> first char is a wordcharacter )
 		{
-			if ( it matches a logical word )
+			if ( it matches "if" "while" or "until" )
 			{
-				if ( immediate left of this token is ';' or '\n' )
+				if ( immediate left of this token is ';' or '\n' or '|' or '(' )
 				{
 					make a new command
 					point u.command[1] of the sequence command assoc. with
-						the ';' or '\n' at this command ( I think it'll be top )
+						the immediate left token at this command 
+						( I think it'll be base )
 					
+					increment scope,
+					make an appropriate new conditional command while, if, until
+					zero out the u.command[] array
+					put in base[scope] realloc if necesary 
+						// maybe sep function
+						
+					// done?	
 				}
 				else
-				{
-					// do nothing, fall through and continue
-				}
+					// do nothing it's just a word then, fall through and continue
 		 
 			}
+			else if ( matches "done", "fi )
+			{
+				if( prev. token is ';' '\n' )
+				{
+					cond = 0 ;
+					maybe null out base[scope]
+					decrement scope
+				}
+				else
+					//do nothing, 'tis a word
+			}
+			else if ( matches "do" "then" "else")
+			{
+				continue
+			}
+			
 			---- this is for nonlogical words
 			if ( immediate left command is simple command )
 			{
@@ -218,6 +243,11 @@ read_command_stream( command_stream_t s )
 			{
 				make a new simple command
 				put this token into the word of that command
+				if( this isn't the first command )
+					point base[scope] 's u.command[] at this by finding the first
+						non null element in that array and putting this there
+				else if ( this is the first command )
+					point base[0] at this
 			}
 			----
 		}
@@ -236,13 +266,87 @@ reduce_stack( stack_t stack )
 }
 
 
+===========1/11/15=========
+REDO read_stream
 
 
+read_command_stream( command_stream_t s )
+{
+	command* divider // points to second element (index 1) @ start
+->	command* top // points to the top of command tree
+	int scope = 0 // where we are in base[]
+	command* base[ 5 ] // 5 for now, pointer to top of scope 
+		// base[0] may replace top
+	int cond = 0
+	command* last
+	
+	while divider isn't the end
+	{
+		// first look at new token to the left of divider that we just put on
+		if ( last == null )
+		if ( word -> first char is a wordcharacter )
+		{
+			if ( it matches "if" "while" or "until" )
+			{
+				if ( immediate left of this token is ';' or '\n' or '|' or '(' )
+				{
+					make a new command
+					point u.command[1] of the sequence command assoc. with
+						the immediate left token at this command 
+						( I think it'll be base )
+					
+					increment scope,
+					make an appropriate new conditional command while, if, until
+					zero out the u.command[] array
+					put in base[scope] realloc if necesary 
+						// maybe sep function
+						
+					// done?	
+				}
+				else
+					// do nothing it's just a word then, fall through and continue
+		 
+			}
+			else if ( matches "done", "fi )
+			{
+				if( prev. token is ';' '\n' )
+				{
+					cond = 0 ;
+					maybe null out base[scope]
+					decrement scope
+				}
+				else
+					//do nothing, 'tis a word
+			}
+			else if ( matches "do" "then" "else")
+			{
+				continue
+			}
+			
+			---- this is for nonlogical words
+			if ( immediate left command is simple command )
+			{
+				concat this token onto the word of that command
+			}
+			else
+			{
+				make a new simple command
+				put this token into the word of that command
+				if( this isn't the first command )
+					point base[scope] 's u.command[] at this by finding the first
+						non null element in that array and putting this there
+				else if ( this is the first command )
+					point base[0] at this
+			}
+			----
+		}
+		
 
 
-
-
-
+		move the divider right one command
+	}	
+	
+}
 
 
 
