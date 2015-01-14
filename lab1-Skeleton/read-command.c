@@ -159,7 +159,8 @@ make_command_stream (int (*get_next_byte) (void *),
 			exit(EXIT_FAILURE);
 		}
 		
-
+		prev = c ;
+		c = get_next_byte( get_next_byte_argument ) ;
 	}   while( c != EOF );
 	token[current] = '\0';
 	stream->tok[stream_iter] = token;
@@ -168,17 +169,23 @@ make_command_stream (int (*get_next_byte) (void *),
   return stream;
 }
 
-void add_word( char** arr, char* word )
+void add_word( char*** arr, char* word )
 {// maintains the resizeable arrays in u.word of commands
 	int size = 1 ; // always needs space for at least one ending nullptr
-	while(arr != NULL && *arr != NULL) // false for nullptr ?
+	if( *arr == NULL )
 	{
-		size ++ ;
-		arr ++ ;
+		*arr = (char**) malloc( (size+1) * sizeof(char*) ) ;
 	}
-	arr = (char **) realloc( arr, (size+1) * sizeof(char*) ) ;
-	arr[size-1] = word ;
-	arr[size] = NULL ;
+	else
+	{
+		while( *(*arr + size - 1) != NULL) // false for nullptr ?
+		{
+			size ++ ;
+		}
+		*arr = (char **) realloc( *arr, (size+1) * sizeof(char*) ) ;
+	}
+	(*arr)[size-1] = word ;
+	(*arr)[size] = NULL ;
 }
 
 int fits_command( char* token, command_t cmd)
@@ -187,30 +194,30 @@ int fits_command( char* token, command_t cmd)
 	command_t c_0 = cmd->u.command[0] ;
 	command_t c_1 = cmd->u.command[1] ;
 	command_t c_2 = cmd->u.command[2] ;
-	if( ( strcmp( token, "do")) 
+	if( ( !strcmp( token, "do")) 
 		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
 	{
 		return ( c_0 == NULL ) ;
 	}
-	else if( ( strcmp( token, "done" ) )
+	else if( ( !strcmp( token, "done" ) )
 		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
 	{
 		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ; 
 	}
-	else if( ( strcmp(token,"then") ) && ( t == IF_COMMAND ) )
+	else if( ( !strcmp(token,"then") ) && ( t == IF_COMMAND ) )
 	{
 		return ( c_0 == NULL ) ;
 	}
-	else if( ( strcmp( token, "else") ) && ( t == IF_COMMAND ) )
+	else if( ( !strcmp( token, "else") ) && ( t == IF_COMMAND ) )
 	{
 		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
 	}
-	else if( ( strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
+	else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
 	{
 		return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) )
 				|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) ) ) ; 
 	}
-	else if( ( strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
+	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
 	{
 		return ( c_0 != NULL ) ;
 	}
@@ -274,7 +281,14 @@ command_t pop_base( command_t* base , int* scope )
 			}
 			slot ++ ; 
 		}
-		base[*scope-1]->u.command[slot] = temp ;
+		if( ( temp != NULL ) && ( temp->type == SEQUENCE_COMMAND ) && ( temp->u.command[1] == NULL ) )
+		{
+			base[*scope-1]->u.command[slot] = temp->u.command[0] ;
+		}
+		else
+		{	
+			base[*scope-1]->u.command[slot] = temp ;
+		}
 		(*scope)-- ;
 	}
 	else if( *scope == 0 )
@@ -316,26 +330,26 @@ read_command_stream (command_stream_t s)
 	for( ; s->div < s->size ; s->div ++  ) 
 	{
 		token = s->tok[s->div] ;
-		if( strcmp( token, "#" ) ) 
+		if( !strcmp( token, "#" ) ) 
 		{
 			while( ( s->div + 1 < s->size ) 
-					&& ( strcmp(s->tok[ s->div + 1 ], "\n") ) )
+					&& ( !strcmp(s->tok[ s->div + 1 ], "\n") ) )
 			{
 				s->div ++ ; // simply ignore until we need to process a newline
 			}
 			continue ;
 		}
-		else if( strcmp( token, "if" ) || strcmp( token, "while" ) || 
-				strcmp( token, "until") || strcmp( token, "(" ) )
+		else if( !strcmp( token, "if" ) || !strcmp( token, "while" ) || 
+				!strcmp( token, "until") || !strcmp( token, "(" ) )
 		{
 			if( base[scope] == NULL )
 			{ // if top of base stack is expecting a new command
-				enum command_type t = ( ( strcmp(token, "if") )? IF_COMMAND : 
-							( strcmp( token, "while") )? WHILE_COMMAND :
-							( strcmp(token, "until") )? UNTIL_COMMAND : 
+				enum command_type t = ( ( !strcmp(token, "if") )? IF_COMMAND : 
+							( !strcmp( token, "while") )? WHILE_COMMAND :
+							( !strcmp(token, "until") )? UNTIL_COMMAND : 
 							SUBSHELL_COMMAND );
 				command_t cmd = new_command( t ) ; 
-				push_base( cmd, base, &scope, &size ) ;
+				base[scope] = cmd ;
 				push_base( NULL, base, &scope, &size ) ;
 				continue ;
 			} 
@@ -345,29 +359,37 @@ read_command_stream (command_stream_t s)
 				exit(1) ;
 			} // otherwise, fall through and treat as word
 		}
-		else if( (strcmp(token, "done") ) || (strcmp(token, "do")) 
-				|| (strcmp(token, "fi")) || ( strcmp(token, "then") ) 
-				|| ( strcmp(token, ")" ) ) ) 
+		else if( (!strcmp(token, "done") ) || (!strcmp(token, "do")) 
+				|| (!strcmp(token, "fi")) || ( !strcmp(token, "then") ) 
+				|| (!strcmp(token, "else")) || ( !strcmp(token, ")" ) ) ) 
 		{
-			if(	(base[scope] == NULL)
-				&& (scope > 1) && (base[scope-1]->type == SEQUENCE_COMMAND) )
+			if( (!strcmp(token, ")")) || ( (base[scope] == NULL) && (scope > 1) && (base[scope-1]->type == SEQUENCE_COMMAND) ) )
 			{
 				if( fits_command( token, base[scope-2] ) )
 				{
+						if( ( strcmp( token, ")" ) && base[scope-1]->type != PIPE_COMMAND) // in this case, ther is a null to pop off 
+							|| (!strcmp( token, ")") && base[scope] == NULL )) // TODO: look over )
+						{
+							pop_base( base, &scope ) ;
+						}
 						pop_base( base, &scope ) ;
-						pop_base( base, &scope ) ;
-						if( ( strcmp(token, "then")) || (strcmp(token, "do")) 
-							||(strcmp(token, "else")) ) 
+
+						if( ( !strcmp(token, "then")) || (!strcmp(token, "do")) 
+							|| (!strcmp(token, "else")) ) 
+						{
 							push_base( NULL, base, &scope, &size ) ;
+						}
+						continue ;
 				}
 			}
 			else
 			{
+				
 				printf("Invalid syntax! unexpected token near %s\n", token) ;
 				exit(1) ;
 			}
 		}
-		else if( strcmp(token, ";") || strcmp(token, "|") )
+		else if( !strcmp(token, ";") || !strcmp(token, "|") )
 		{
 			if( base[scope] == NULL )
 			{
@@ -382,7 +404,7 @@ read_command_stream (command_stream_t s)
 				pop_base( base, &scope ) ;// should put complete cmd in base[scope-1]
 			} 							// only if there was a ; preceeding it
 
-			enum command_type t = (strcmp(token, ";"))? SEQUENCE_COMMAND : PIPE_COMMAND ;
+			enum command_type t = (!strcmp(token, ";"))? SEQUENCE_COMMAND : PIPE_COMMAND ;
 			command_t cmd = new_command( t ) ;
 			cmd->u.command[0] = base[scope] ; //stick complete cmd under this new one
 			base[scope] = cmd ; // stick in this new one as the top of the subtree
@@ -390,7 +412,7 @@ read_command_stream (command_stream_t s)
 			push_base( NULL, base, &scope, &size ) ;
 			continue ;
 		}
-		else if( strcmp(token, "\n") )
+		else if( !strcmp(token, "\n") )
 		{
 			s->line_num ++ ;
 			if( base[scope] == NULL )
@@ -402,7 +424,7 @@ read_command_stream (command_stream_t s)
 				//if( scope != 1 ) I also had an else in the below cond
 				//	continue ; // but I think this might be redundant
 				if( ( scope == 1 ) && ( base[scope-1]->type == SEQUENCE_COMMAND )
-					&& (s->div < s->size - 1) && ( strcmp(s->tok[s->div+1], "\n") ) )
+					&& (s->div < s->size - 1) && (!strcmp(s->tok[s->div+1], "\n") ) )
 				{ // if it's a dangling ";" at scope 0
 					
 						// end command, check final syntax return
@@ -417,31 +439,37 @@ read_command_stream (command_stream_t s)
 			{
 				if( ( scope == 0 ) 
 					&&( s->div < s->size - 1 ) 
-					&&( strcmp( s->tok[s->div+1], "\n" ) ) )
+					&&( !strcmp( s->tok[s->div+1], "\n" ) ) )
 				{ // end case
+					printf("reached here(!)\n") ;
+					s->div += 2;
 					break;
 				}
 				else
 				{
+					if( base[scope-1]->type == SEQUENCE_COMMAND || base[scope-1]->type == PIPE_COMMAND )
+					{
+						pop_base( base, &scope ) ;// should put complete cmd in base[scope-1]
+					}
 					command_t cmd = new_command( SEQUENCE_COMMAND ) ;
 					cmd->u.command[0] = base[scope] ;
-					base[scope] = cmd ;
+					base[scope] = cmd ; //or should we assign it? we popped off null earlier?
 					push_base( NULL, base, &scope, &size ) ;
 				}
 			}
 			continue ;
 		}
-		else if( strcmp( token, "<" ) || strcmp( token,">") )
+		else if( !strcmp( token, "<" ) || !strcmp( token,">") ) // allows >out <in // TODO: fix later
 		{
-			int in = (strcmp(token, "<"))? 1 : 0 ; // 1 => In // 0 => Out
+			int in = (!strcmp(token, "<"))? 1 : 0 ; // 1 => In // 0 => Out
 			if( ( base[scope] != NULL ) 
- 				&&  ( ( in && ( base[scope]->input != NULL ) ) 
-					  || ( (!in) && ( base[scope]->output != NULL ) ) ) )
+ 				&&  ( ( in && ( base[scope]->input == NULL ) ) 
+					  || ( (!in) && ( base[scope]->output == NULL ) ) ) )
 			{
-				if ( s->div < s->size - 1 ) 
+				if ( s->div < ( s->size - 1 ) ) 
 				{
 					char * next = s->tok[s->div+1] ;
-					if( ( strcmp(next, ";")) && ( strcmp( next, "|")) 
+					if( ( strcmp(next, "\n") ) && ( strcmp(next, ";")) && ( strcmp( next, "|")) 
 					&& ( strcmp( next, "(")) && ( strcmp( next, ")")) 
 					&& ( strcmp( next, "<")) && ( strcmp( next, ">") ) )
 					{// next token is a valid word token
@@ -468,13 +496,14 @@ read_command_stream (command_stream_t s)
 //		{
 			if( base[scope] == NULL )
 			{
+				//printf("token = %s\n" , token ) ;
 				command_t cmd = new_command( SIMPLE_COMMAND ) ;
-				add_word( cmd->u.word, token ) ;
-				push_base( cmd, base, &scope, &size ) ;
+				add_word( &cmd->u.word, token ) ;
+				base[scope] = cmd ;
 			}
 			else if( base[scope]->type == SIMPLE_COMMAND )
 			{
-				add_word( base[scope]->u.word, token ) ;	
+				add_word( &base[scope]->u.word, token ) ;	
 			}
 			else
 			{ //syntax error
@@ -493,6 +522,7 @@ read_command_stream (command_stream_t s)
 		if( scope == 1 && base[scope-1]->type == SEQUENCE_COMMAND ) 
 		{
 			pop_base( base, &scope ) ; // it's ok to pop a null
+			printf( "returned base[scope] = %d" , base[scope]->type ) ;
 			return base[scope] ;
 			//good to go
 		}
@@ -506,10 +536,13 @@ read_command_stream (command_stream_t s)
 	{
 		if( base[scope] != NULL )
 		{ // good to go
+			printf( "returned base[scope] = %d\n" , base[scope]->type ) ;
 			return base[scope] ;
 		}
 		else
 		{
+			printf("read return 0\n") ;
+			//printf("info: base[%d]->type %i, div: %i,  \n", scope, base[scope]->type, s->div ) ;
 			return 0 ; // return null command ( or false )
 		}
 	}
