@@ -194,42 +194,49 @@ void add_word( char*** arr, char* word )
 	(*arr)[size] = NULL ;
 }
 
-int fits_command( char* token, command_t cmd)
+int fits_command( char* token, command_t* base, int scope )
 {//	checks if the string token matches the given command
-//	
-	enum command_type t = cmd->type ;
+//	he we assume, base[scope] is non null, 
+//		and base[scope-1] is the target
+	command_t cmd = base[scope-1] ;
+	enum command_type t = cmd->type ; // type of target
+	enum command_type in = base[scope]->type ; // type of input
 	command_t c_0 = cmd->u.command[0] ;
 	command_t c_1 = cmd->u.command[1] ;
 	command_t c_2 = cmd->u.command[2] ;
-	if( ( !strcmp( token, "do")) 
-		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
+	if( in == SEQUENCE_COMMAND )
 	{
-		return ( c_0 == NULL ) ;
-	}
-	else if( ( !strcmp( token, "done" ) )
-		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
-	{
-		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ; 
-	}
-	else if( ( !strcmp(token,"then") ) && ( t == IF_COMMAND ) )
-	{
-		return ( c_0 == NULL ) ;
-	}
-	else if( ( !strcmp( token, "else") ) && ( t == IF_COMMAND ) )
-	{
-		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
-	}
-	else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
-	{
-		return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) )
-				|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) ) ) ; 
+		if( ( !strcmp( token, "do")) 
+			&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
+		{
+			return ( c_0 == NULL ) ;
+		}
+		else if( ( !strcmp( token, "done" ) )
+			&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
+		{
+			return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ; 
+		}
+		else if( ( !strcmp(token,"then") ) && ( t == IF_COMMAND ) )
+		{
+			return ( c_0 == NULL ) ;
+		}
+		else if( ( !strcmp( token, "else") ) && ( t == IF_COMMAND ) )
+		{
+			return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
+		}
+		else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
+		{
+			return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) )
+					|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) ) ) ; 
+		}
 	}
 	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
 	{
 		return ( c_0 == NULL ) ;
 	}
-	else
-		return 0 ;
+	//else
+	
+	return 0 ;
 } 
 
 command_t new_command( enum command_type t)
@@ -379,9 +386,9 @@ read_command_stream (command_stream_t s)
 					 ||	( !strcmp(token, ")") && (base[scope-1]->type == SEQUENCE_COMMAND ||( base[scope-1]->type == PIPE_COMMAND && base[scope] != NULL )) ) )
 					{
 						pop_base( base, &scope ) ;
-					} // fall through
-
-					if( fits_command( token, base[scope-1] ) )
+					} // fall through, after this, the thing to be popped in isn't null
+					
+					if( fits_command( token, base, scope ) )
 					{
 						pop_base( base, &scope ) ;
 
