@@ -219,7 +219,7 @@ int fits_command( char* token, command_t cmd)
 	}
 	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
 	{
-		return ( c_0 != NULL ) ;
+		return ( c_0 == NULL ) ;
 	}
 	else
 		return 0 ;
@@ -291,13 +291,14 @@ command_t pop_base( command_t* base , int* scope )
 		}
 		(*scope)-- ;
 	}
-	else if( *scope == 0 )
-		fprintf( stderr, "in pop_base: called while scope == 0\n") ;
 	else if( *scope < 0 )
 	{
 		printf("error in pop_base: tried to call with negative scope \n") ;
 		exit(1) ;
 	}
+	// if *scope == 0, fall through, last command
+	if( *scope == 0 )
+		fprintf( stderr, "popped off the last command\n") ;
 
 	fprintf( stderr, "popped off %s\n" , (temp == NULL)? "NULL" 
 									: (temp->type == IF_COMMAND)? "IF" 
@@ -308,6 +309,7 @@ command_t pop_base( command_t* base , int* scope )
 									: (temp->type == UNTIL_COMMAND)? "UNTIL"
 									: (temp->type == WHILE_COMMAND)? "WHILE"
 									: "FAULTY COMMAND" ) ;
+
 	return temp ;	
 }
 
@@ -363,31 +365,29 @@ read_command_stream (command_stream_t s)
 				|| (!strcmp(token, "fi")) || ( !strcmp(token, "then") ) 
 				|| (!strcmp(token, "else")) || ( !strcmp(token, ")" ) ) ) 
 		{
-			if( (!strcmp(token, ")")) || ( (base[scope] == NULL) && (scope > 1) && (base[scope-1]->type == SEQUENCE_COMMAND) ) )
+			if( scope > 1 ) 
 			{
-				if( fits_command( token, base[scope-2] ) )
+				if( ( base[scope-1]->type == SEQUENCE_COMMAND && base[scope] == NULL  ) 
+				 ||	( !strcmp(token, ")") && (base[scope-1]->type == SEQUENCE_COMMAND ||( base[scope-1]->type == PIPE_COMMAND && base[scope] != NULL )) ) )
 				{
-						if( ( strcmp( token, ")" ) && base[scope-1]->type != PIPE_COMMAND) // in this case, ther is a null to pop off 
-							|| (!strcmp( token, ")") && base[scope] == NULL )) // TODO: look over )
-						{
-							pop_base( base, &scope ) ;
-						}
-						pop_base( base, &scope ) ;
+					pop_base( base, &scope ) ;
+				} // fall through
 
-						if( ( !strcmp(token, "then")) || (!strcmp(token, "do")) 
-							|| (!strcmp(token, "else")) ) 
-						{
-							push_base( NULL, base, &scope, &size ) ;
-						}
-						continue ;
+				if( fits_command( token, base[scope-1] ) )
+				{
+					pop_base( base, &scope ) ;
+
+					if( ( !strcmp(token, "then")) || (!strcmp(token, "do")) 
+						|| (!strcmp(token, "else")) ) 
+					{
+						push_base( NULL, base, &scope, &size ) ;
+					}
+					continue ;
 				}
-			}
-			else
-			{
-				
-				printf("Invalid syntax! unexpected token near %s\n", token) ;
-				exit(1) ;
-			}
+			} // fall through
+			
+			printf("Invalid syntax! unexpected token near %s\n", token) ;
+			exit(1) ;
 		}
 		else if( !strcmp(token, ";") || !strcmp(token, "|") )
 		{
@@ -522,8 +522,8 @@ read_command_stream (command_stream_t s)
 		if( scope == 1 && base[scope-1]->type == SEQUENCE_COMMAND ) 
 		{
 			pop_base( base, &scope ) ; // it's ok to pop a null
-			printf( "returned base[scope] = %d" , base[scope]->type ) ;
-			return base[scope] ;
+			printf( "returned base[scope] = %d\n" , base[scope]->type ) ;
+			return base[0]->u.command[0] ;
 			//good to go
 		}
 		else
@@ -537,7 +537,7 @@ read_command_stream (command_stream_t s)
 		if( base[scope] != NULL )
 		{ // good to go
 			printf( "returned base[scope] = %d\n" , base[scope]->type ) ;
-			return base[scope] ;
+			return pop_base( base, &scope) ;
 		}
 		else
 		{
