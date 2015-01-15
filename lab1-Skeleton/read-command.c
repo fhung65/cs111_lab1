@@ -82,6 +82,7 @@ make_command_stream (int (*get_next_byte) (void *),
 			}
 		}
 		else if (c == '#'){
+		  if(prev == ' ' || prev == '\t' || prev == '\n' || prev == '\0'){
 			if(tstart == 0){
 				token[current] = '\0';
 				stream->tok[stream_iter] = token;
@@ -100,7 +101,9 @@ make_command_stream (int (*get_next_byte) (void *),
 				c = get_next_byte(get_next_byte_argument);
 			} 
 			continue; // c is replaced at the end, so continue skips
-			
+		  } else {
+		    error(2,0,"Invalid character");
+		  }
 		}
 		else if ( ( c == ' ' ) || ( c == '\t' ) )
 		{
@@ -157,8 +160,8 @@ make_command_stream (int (*get_next_byte) (void *),
 		else // nonvalid character ( double check that this only means exit now)
 		{
 			// TODO: exit with error
-			error(2, 0 , "syntax error"); //or other message?
-			exit(EXIT_FAILURE);
+		  error(2, 0 , "syntax error"); //or other message?
+			//exit(EXIT_FAILURE);
 		}
 		
 		prev = c ;
