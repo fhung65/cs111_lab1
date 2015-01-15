@@ -415,6 +415,15 @@ read_command_stream (command_stream_t s)
 		else if( !strcmp(token, "\n") )
 		{
 			s->line_num ++ ;
+			if(	( ( scope == 0 && base[scope] != NULL) ||  (scope == 1 && base[0]->type == SEQUENCE_COMMAND)  )
+				&&( s->div < s->size - 1 ) 
+				&&( !strcmp( s->tok[s->div+1], "\n" ) ) ) 
+			{ // end case
+				printf("reached here(!)\n") ;
+				s->div += 2;
+				break;
+			}
+
 			if( base[scope] == NULL )
 			{
 				// it's been \n's since the start of this subtree, or 
@@ -432,30 +441,19 @@ read_command_stream (command_stream_t s)
 					
 					// I think that's it for this case
 				}
-				else
+				else 
 					continue ; //?
 			}
 			else // base[scope] != null
 			{
-				if( ( scope == 0 ) 
-					&&( s->div < s->size - 1 ) 
-					&&( !strcmp( s->tok[s->div+1], "\n" ) ) )
-				{ // end case
-					printf("reached here(!)\n") ;
-					s->div += 2;
-					break;
-				}
-				else
+				if( base[scope-1]->type == SEQUENCE_COMMAND || base[scope-1]->type == PIPE_COMMAND )
 				{
-					if( base[scope-1]->type == SEQUENCE_COMMAND || base[scope-1]->type == PIPE_COMMAND )
-					{
-						pop_base( base, &scope ) ;// should put complete cmd in base[scope-1]
-					}
-					command_t cmd = new_command( SEQUENCE_COMMAND ) ;
-					cmd->u.command[0] = base[scope] ;
-					base[scope] = cmd ; //or should we assign it? we popped off null earlier?
-					push_base( NULL, base, &scope, &size ) ;
+					pop_base( base, &scope ) ;// should put complete cmd in base[scope-1]
 				}
+				command_t cmd = new_command( SEQUENCE_COMMAND ) ;
+				cmd->u.command[0] = base[scope] ;
+				base[scope] = cmd ; //or should we assign it? we popped off null earlier?
+				push_base( NULL, base, &scope, &size ) ;
 			}
 			continue ;
 		}
