@@ -204,31 +204,29 @@ int fits_command( char* token, command_t* base, int scope )
 	command_t c_0 = cmd->u.command[0] ;
 	command_t c_1 = cmd->u.command[1] ;
 	command_t c_2 = cmd->u.command[2] ;
-	if( in == SEQUENCE_COMMAND )
+
+	if( ( !strcmp( token, "do")) 
+		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
 	{
-		if( ( !strcmp( token, "do")) 
-			&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
-		{
-			return ( c_0 == NULL ) ;
-		}
-		else if( ( !strcmp( token, "done" ) )
-			&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
-		{
-			return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ; 
-		}
-		else if( ( !strcmp(token,"then") ) && ( t == IF_COMMAND ) )
-		{
-			return ( c_0 == NULL ) ;
-		}
-		else if( ( !strcmp( token, "else") ) && ( t == IF_COMMAND ) )
-		{
-			return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
-		}
-		else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
-		{
-			return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) )
-					|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) ) ) ; 
-		}
+		return ( c_0 == NULL ) ;
+	}
+	else if( ( !strcmp( token, "done" ) )
+		&& ( ( t == WHILE_COMMAND ) || ( t == UNTIL_COMMAND ) ) )
+	{
+		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ; 
+	}
+	else if( ( !strcmp(token,"then") ) && ( t == IF_COMMAND ) )
+	{
+		return ( c_0 == NULL ) ;
+	}
+	else if( ( !strcmp( token, "else") ) && ( t == IF_COMMAND ) )
+	{
+		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
+	}
+	else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
+	{
+		return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) && ( in == SEQUENCE_COMMAND ) )
+				|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) && (in == SEQUENCE_COMMAND) ) ) ; 
 	}
 	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
 	{
