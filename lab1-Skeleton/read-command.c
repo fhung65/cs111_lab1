@@ -607,10 +607,10 @@ void free_command_stream( command_stream_t stream )
 {
 	for( int i = 0 ; i < stream->size ; i++ )
 	{
-		printf("freeing %s\n", stream->tok[i] ) ;
+		//printf("freeing %s\n", stream->tok[i] ) ;
 		free( stream->tok[i] ) ;
 	}
-	printf("freed stream\n") ;
+	//printf("freed stream\n") ;
 	free( stream->tok ) ;
 	free( stream ) ;
 }
