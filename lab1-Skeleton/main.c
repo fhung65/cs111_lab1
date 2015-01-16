@@ -66,6 +66,8 @@ main (int argc, char **argv)
     error (1, errno, "%s: cannot open", script_name);
   command_stream_t command_stream =
     make_command_stream (get_next_byte, script_stream);
+	
+	fclose( script_stream ) ;
   int profiling = -1;
   if (profile_name)
     {
@@ -75,20 +77,21 @@ main (int argc, char **argv)
     }
 
   command_t last_command = NULL;
-  command_t command;
+  command_t command = NULL ;
   while ((command = read_command_stream (command_stream)))
     {
-      if (print_tree)
-	{
-	  printf ("# %d\n", command_number++);
-	  print_command (command);
-	}
-      else
-	{
+	  free_command_tree( last_command ) ;
 	  last_command = command;
-	  execute_command (command, profiling);
-	}
+      if (print_tree)
+		{
+		  printf ("# %d\n", command_number++);
+		  print_command (command);
+		}
+	  else
+		{
+		//  execute_command (command, profiling);
+		}
     }
-
+	free_command_stream( command_stream ) ;
   return print_tree || !last_command ? 0 : command_status (last_command);
 }
