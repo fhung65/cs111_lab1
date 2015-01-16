@@ -201,9 +201,13 @@ int fits_command( char* token, command_t* base, int scope )
 {//	checks if the string token matches the given command
 //	he we assume, base[scope] is non null, 
 //		and base[scope-1] is the target
+	if(scope == 0) // sanity check
+		return 0 ;
 	command_t cmd = base[scope-1] ;
 	enum command_type t = cmd->type ; // type of target
-	enum command_type in = base[scope]->type ; // type of input
+	enum command_type in ;
+	if( base[scope] != NULL) 
+		in = base[scope]->type ; // type of input
 	command_t c_0 = cmd->u.command[0] ;
 	command_t c_1 = cmd->u.command[1] ;
 	command_t c_2 = cmd->u.command[2] ;
@@ -226,13 +230,13 @@ int fits_command( char* token, command_t* base, int scope )
 	{
 		return ( ( c_0 != NULL ) && ( c_1 == NULL ) ) ;
 	}
-	else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) )
+	else if( ( !strcmp( token, "fi") ) && ( t == IF_COMMAND ) && (base[scope] != NULL) )
 	{
 		return ( ( ( c_0 != NULL ) && ( c_1 == NULL ) && ( in == SEQUENCE_COMMAND ) )
 				|| ( ( c_0 != NULL ) && ( c_1 != NULL ) && ( c_2 == NULL ) 
 						&&	(in == SEQUENCE_COMMAND) ) ) ; 
 	}
-	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) )
+	else if( ( !strcmp( token, ")" ) ) && ( t == SUBSHELL_COMMAND ) && base[scope] != NULL )
 	{
 		return ( c_0 == NULL ) ;
 	}
@@ -624,7 +628,7 @@ void free_command_tree( command_t tree )
 	}
 	else if( tree->type == SIMPLE_COMMAND )
 	{
-		printf("\nfreed simple, word starting with %s\n\n", tree->u.word[0]);
+	//	printf("\nfreed simple, word starting with %s\n\n", tree->u.word[0]);
 		free( tree->u.word ) ;
 		free( tree ) ;
 		return ;
@@ -634,15 +638,15 @@ void free_command_tree( command_t tree )
 	{
 		free_command_tree( tree->u.command[i] ) ;
 	}
-	printf("freed: %s\n" , (tree == NULL)? "NULL" 
-				: (tree->type == IF_COMMAND)? "IF" 
-				: (tree->type == PIPE_COMMAND)? "PIPE"
-				: (tree->type == SEQUENCE_COMMAND)? "SEQUENCE?"
-				: (tree->type == SIMPLE_COMMAND)? "SIMPLE"
-				: (tree->type == SUBSHELL_COMMAND)? "SUBSHELL"
-				: (tree->type == UNTIL_COMMAND)? "UNTIL"
-				: (tree->type == WHILE_COMMAND)? "WHILE"
-				: "FAULTY COMMAND" ) ;
+//	printf("freed: %s\n" , (tree == NULL)? "NULL" 
+//				: (tree->type == IF_COMMAND)? "IF" 
+//				: (tree->type == PIPE_COMMAND)? "PIPE"
+//				: (tree->type == SEQUENCE_COMMAND)? "SEQUENCE?"
+//				: (tree->type == SIMPLE_COMMAND)? "SIMPLE"
+//				: (tree->type == SUBSHELL_COMMAND)? "SUBSHELL"
+//				: (tree->type == UNTIL_COMMAND)? "UNTIL"
+//				: (tree->type == WHILE_COMMAND)? "WHILE"
+//				: "FAULTY COMMAND" ) ;
 	free( tree ) ;
 
 }
