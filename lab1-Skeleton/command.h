@@ -24,6 +24,8 @@ typedef struct command_stream *command_stream_t;
    (setting errno) on failure.  */
 command_stream_t make_command_stream (int (*getbyte) (void *), void *arg);
 
+void free_command_stream( command_stream_t stream) ;
+
 /* Prepare for profiling to the file FILENAME.  If FILENAME is null or
    cannot be written to, set errno and return -1.  Otherwise, return a
    nonnegative integer flag useful as an argument to
@@ -33,6 +35,8 @@ int prepare_profiling (char const *filename);
 /* Read a command from STREAM; return it, or NULL on EOF.  If there is
    an error, report the error and exit instead of returning.  */
 command_t read_command_stream (command_stream_t stream);
+
+void free_command_tree( command_t tree) ;
 
 /* Print a command to stdout, for debugging.  */
 void print_command (command_t);
@@ -44,3 +48,7 @@ void execute_command (command_t, int);
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */
 int command_status (command_t);
+
+
+
+
