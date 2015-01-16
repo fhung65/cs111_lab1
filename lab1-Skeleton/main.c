@@ -92,6 +92,7 @@ main (int argc, char **argv)
 		//  execute_command (command, profiling);
 		}
     }
+	free_command_tree( last_command ) ;
 	free_command_stream( command_stream ) ;
   return print_tree || !last_command ? 0 : command_status (last_command);
 }
