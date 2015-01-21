@@ -604,6 +604,7 @@ read_command_stream (command_stream_t s)
 	}
 
 	fprintf(stderr, "should never have gotten here, but compiler's being a pain\n") ;
+	free( base ) ;
 	return 0 ;
 }
 
@@ -638,6 +639,9 @@ void free_command_tree( command_t tree )
 	{
 		free_command_tree( tree->u.command[i] ) ;
 	}
+	free( tree ) ;
+
+}
 //	printf("freed: %s\n" , (tree == NULL)? "NULL" 
 //				: (tree->type == IF_COMMAND)? "IF" 
 //				: (tree->type == PIPE_COMMAND)? "PIPE"
@@ -647,6 +651,3 @@ void free_command_tree( command_t tree )
 //				: (tree->type == UNTIL_COMMAND)? "UNTIL"
 //				: (tree->type == WHILE_COMMAND)? "WHILE"
 //				: "FAULTY COMMAND" ) ;
-	free( tree ) ;
-
-}

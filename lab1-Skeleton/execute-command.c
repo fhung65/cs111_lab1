@@ -19,7 +19,7 @@
 #include "command-internals.h"
 
 #include <error.h>
-
+#include <stdio.h>
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
@@ -42,6 +42,60 @@ command_status (command_t c)
 void
 execute_command (command_t c, int profiling)
 {
-  /* FIXME: Replace this with your implementation, like 'prepare_profiling'.  */
-  error (1, 0, "command execution not yet implemented");
+	switch( c->type )
+	{
+		case IF_COMMAND:
+			execute_command( c->u.command[0], profiling ) ;
+			if( c->u.command[0]->status == 0 ) 
+			{
+				execute_command( c->u.command[1], profiling ) ;
+				c->status = c->u.command[1]->status ;
+			}
+			else if( c->u.command[2] != NULL )
+			{
+				execute_command( c->u.command[2], profiling ) ;
+				c->status = c->u.command[2]->status ;
+			}
+			break ;
+		case PIPE_COMMAND:
+			execute_command( c->u.command[0], profiling ) ;
+			// do stuff for redirect, maybe buffer
+			execute_command( c->u.command[0], profiling ) ;
+			c->status = c->u.command[1]->status ;
+			break ;
+		case SEQUENCE_COMMAND:
+			execute_command(c->u.command[0], profiling) ;
+			execute_command(c->u.command[1], profiling) ;
+			c->status = (c->u.command[1]->status) ;
+			break ;
+		case SIMPLE_COMMAND:
+			printf("executed ") ;
+			int i = 0;
+			while( c->u.word[i] != NULL)
+			{
+				printf("%s ", c->u.word[i]) ;
+				i ++ ;
+			}
+			printf("\n") ;
+			break ;
+		case SUBSHELL_COMMAND:
+			// ?
+			break ;
+		case UNTIL_COMMAND:
+			do{
+				execute_command(c->u.command[1], profiling) ;
+				execute_command(c->u.command[0], profiling) ;
+			} while ( c->u.command[0]->status == 0 ) ;
+			c->status = c->u.command[1]->status ;
+			break ;
+		case WHILE_COMMAND:
+			execute_command( c->u.command[0], profiling ) ;
+			while( c->u.command[0]->status == 0 )
+			{
+				execute_command( c->u.command[1], profiling ) ;
+				execute_command( c->u.command[0], profiling ) ;
+			}
+			c->status = c->u.command[1]->status ;
+			break ;
+	}
 }
