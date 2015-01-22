@@ -60,7 +60,7 @@ execute_command (command_t c, int profiling)
 		case PIPE_COMMAND:
 			execute_command( c->u.command[0], profiling ) ;
 			// do stuff for redirect, maybe buffer
-			execute_command( c->u.command[0], profiling ) ;
+			execute_command( c->u.command[1], profiling ) ;
 			c->status = c->u.command[1]->status ;
 			break ;
 		case SEQUENCE_COMMAND:
