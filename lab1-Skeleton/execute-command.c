@@ -73,8 +73,15 @@ execute_command (command_t c, int profiling)
 			
 				pid_t p2 = fork() ; // SPAWN PROCESS FOR W
 				if( p2 == -1 )
+				{
+					// if we failed to make a writer, exit the reader
 					_exit(1) ; // TODO: more erroring
+				}
 				else if( p2 == 0 ) { // IN CHILD for W
+					// Writer doesn't need the input of the pipe, so close that
+					if( close(fd[0]) == -1 )
+						_exit(1) ; // TODO
+
 					// WRITER gets stdout replaced
 					if( dup2(fd[1], 1) == -1) 
 						_exit(1) ; // TODO: error
@@ -82,12 +89,15 @@ execute_command (command_t c, int profiling)
 					// run W
 					execute_command( c->u.command[1], profiling ) ; 
 
-					// close W's fds
-					if(close(fd[0]) == -1 || close(fd[1]) == -1) 
+					// close W's output  fd
+					if(close(fd[1]) == -1) 
 						_exit(1) ; // TODO: more error
 					
 					_exit(0) ;
 				}
+				// READER does't need the output side of the pipe, so close that
+				if( close(fd[1]) == -1)
+					_exit(1) ; // TODO
 
 				// READER gets stdin replaced
 				if( dup2(fd[0], 0) == -1) 
@@ -97,14 +107,15 @@ execute_command (command_t c, int profiling)
 				execute_command( c->u.command[0], profiling ) ; 
 
 				if( waitpid( p2, &status, 0 ) == -1) // status is p1's
+				{
 					_exit(1) ; // TODO
-
-				// close R's fds
-				if(close(fd[0]) == -1 || close(fd[1]) == -1 ) 
+				}
+				// close R's input fd
+				if(close(fd[0]) == -1) 
 					_exit(1) ; // TODO: more erroring
 
 				_exit( c->u.command[1]->status ) ; // TODO: check this
-			}
+			} // if we couldn't spawn a reader, we'll have no writer, TODO: verify this is right?
 
 			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) )
 				_exit(1) ;
