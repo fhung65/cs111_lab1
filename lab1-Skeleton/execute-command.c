@@ -20,6 +20,9 @@
 
 #include <error.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
@@ -57,38 +60,107 @@ execute_command (command_t c, int profiling)
 				c->status = c->u.command[2]->status ;
 			}
 			break ;
-		case PIPE_COMMAND:
-			execute_command( c->u.command[0], profiling ) ;
-			// do stuff for redirect, maybe buffer
-			execute_command( c->u.command[1], profiling ) ;
-			c->status = c->u.command[1]->status ;
+		case PIPE_COMMAND: { // W | R 
+			int status ;
+
+			pid_t p1 = fork() ; // FORK A CHILD FOR R
+			if( p1 == -1 ) 
+				_exit(1) ; // TODO: more error handling later
+			else if( p1 == 0 ) {	// IN CHILD for R
+				int fd[2] ;
+				if( pipe( fd ) == -1 )
+					_exit(1) ; // TODO: more error handling later
+			
+				pid_t p2 = fork() ; // SPAWN PROCESS FOR W
+				if( p2 == -1 )
+					_exit(1) ; // TODO: more erroring
+				else if( p2 == 0 ) { // IN CHILD for W
+					// WRITER gets stdout replaced
+					if( dup2(fd[1], 1) == -1) 
+						_exit(1) ; // TODO: error
+
+					// run W
+					execute_command( c->u.command[1], profiling ) ; 
+
+					// close W's fds
+					if(close(fd[0]) == -1 || close(fd[1]) == -1) 
+						_exit(1) ; // TODO: more error
+					
+					_exit(0) ;
+				}
+
+				// READER gets stdin replaced
+				if( dup2(fd[0], 0) == -1) 
+					_exit(1) ; // TODO: error
+
+				// run R
+				execute_command( c->u.command[0], profiling ) ; 
+
+				if( waitpid( p2, &status, 0 ) == -1) // status is p1's
+					_exit(1) ; // TODO
+
+				// close R's fds
+				if(close(fd[0]) == -1 || close(fd[1]) == -1 ) 
+					_exit(1) ; // TODO: more erroring
+
+				_exit( c->u.command[1]->status ) ; // TODO: check this
+			}
+
+			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) )
+				_exit(1) ;
+
+			c->status = WEXITSTATUS(status) ;
 			break ;
-		case SEQUENCE_COMMAND:
+		}
+		case SEQUENCE_COMMAND: {
 			execute_command(c->u.command[0], profiling) ;
 			execute_command(c->u.command[1], profiling) ;
 			c->status = (c->u.command[1]->status) ;
 			break ;
-		case SIMPLE_COMMAND:
+		}
+		case SIMPLE_COMMAND: {
 			printf("executed ") ;
 			int i = 0;
-			while( c->u.word[i] != NULL)
+			while( c->u.word[i] != NULL) 
 			{
 				printf("%s ", c->u.word[i]) ;
 				i ++ ;
+
 			}
 			printf("\n") ;
 			break ;
-		case SUBSHELL_COMMAND:
-			// ?
+		}
+		case SUBSHELL_COMMAND: {
+			int status ;
+			pid_t retval ;
+			pid_t p = fork() ;
+			if(p == -1) {
+				// handle error
+			}
+			else if(p == 0) {
+				execute_command(c->u.command[0], profiling) ;
+				_exit(c->u.command[0]->status) ;
+			}
+			else {
+				retval = waitpid( p, &status, 0 ) ;
+				if( retval == -1 || !WIFEXITED(status)) {
+					//handle error
+				}
+				else { 
+					c->status = WEXITSTATUS(status) ;
+				}
+			}
 			break ;
-		case UNTIL_COMMAND:
+		}
+		case UNTIL_COMMAND: {
 			do{
 				execute_command(c->u.command[1], profiling) ;
 				execute_command(c->u.command[0], profiling) ;
 			} while ( c->u.command[0]->status == 0 ) ;
 			c->status = c->u.command[1]->status ;
 			break ;
-		case WHILE_COMMAND:
+		}
+		case WHILE_COMMAND: {
 			execute_command( c->u.command[0], profiling ) ;
 			while( c->u.command[0]->status == 0 )
 			{
@@ -97,5 +169,9 @@ execute_command (command_t c, int profiling)
 			}
 			c->status = c->u.command[1]->status ;
 			break ;
+		}
+		default: 
+			printf("not a command!, shouldn't have gotten here!\n") ;
+			_exit(1) ;
 	}
 }
