@@ -137,21 +137,19 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case SIMPLE_COMMAND: {
-		  FILE* inf;
-		  FILE* outf;
 		  int in,out;
 		  pid_t pid = fork();
 		  if(pid < 0) error(3, 0, "Failure to fork process");
 		  else if (pid == 0){ //CHILD
 		    if(c->input != NULL){
-		      inf = fopen(c->input, "r");
-		      in = fileno(inf);
+		      in = open(c->input, O_RDONLY);
 		      if(in == -1) error(12, 0, "Couldn't open input");
 		      if(dup2(in,0) < 0) error(13, 0, "Couldn't set STDIN");
 		    }
 		    if(c->output != NULL){
-		      outf = fopen(c->output, "w");
-		      out = fileno(outf);
+		      out = open(c->output, O_WRONLY | O_CREAT | O_TRUNC,
+				 S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
+				 S_IROTH | S_IWOTH);
 		      if(out == -1) error(14, 0, "Couldn't open output");
 		      if(dup2(out,1) < 0) error(15, 0, "Couldn't set STDOUT");
 		    }
