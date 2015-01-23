@@ -65,61 +65,102 @@ execute_command (command_t c, int profiling)
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R
 			if( p1 == -1 ) 
+			{
+				fprintf(stderr, "failed to create reader\n") ;
 				_exit(1) ; // TODO: more error handling later
-			else if( p1 == 0 ) {	// IN CHILD for R
+			}
+			else if( p1 == 0 ) {// IN CHILD for RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
+				fprintf(stderr, "beginning reader process\n");
+				
+				// create the pipe 
 				int fd[2] ;
 				if( pipe( fd ) == -1 )
+				{
+					fprintf(stderr, "failed to create pipe\n" ) ;
 					_exit(1) ; // TODO: more error handling later
-			
-				pid_t p2 = fork() ; // SPAWN PROCESS FOR W
+				}
+
+				//spawn a process for W
+				pid_t p2 = fork() ; 
 				if( p2 == -1 )
 				{
+					fprintf(stderr, "failed to make writer\n" ) ;
 					// if we failed to make a writer, exit the reader
 					_exit(1) ; // TODO: more erroring
 				}
-				else if( p2 == 0 ) { // IN CHILD for W
+				else if( p2 == 0 ) { // IN CHILD for WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+					fprintf(stderr, "beginning writer process\n") ;
 					// Writer doesn't need the input of the pipe, so close that
 					if( close(fd[0]) == -1 )
+					{
+						fprintf(stderr, "failed to close read end of pipe in writer\n" ) ;
 						_exit(1) ; // TODO
+					}
+					//fprintf(stdout, "can still print to stdout?\n") ;
 
-					// WRITER gets stdout replaced
-					if( dup2(fd[1], 1) == -1) 
+					// WRITER turns stdout into fd[1]
+					if( dup2(fd[1], STDOUT_FILENO) == -1) 
+					{
+						fprintf(stderr, "failed to swap outputs in writer\n" ) ;
 						_exit(1) ; // TODO: error
-
+					}
+					//fprintf(stdout, "can still print to stdout?\n") ;
 					// run W
-					execute_command( c->u.command[1], profiling ) ; 
+					fprintf(stderr, "running writing command\n") ;
+					execute_command( c->u.command[0], profiling ) ; 
+					fprintf(stderr, "done with writing command\n") ;
 
-					// close W's output  fd
+					// close W's output fd  // do we need to close the new stdout? prolly not?, we're exiting
 					if(close(fd[1]) == -1) 
+					{	
+						fprintf(stderr, "failed to close write end of writer\n") ; 
 						_exit(1) ; // TODO: more error
-					
-					_exit(0) ;
-				}
+					}
+
+					fprintf(stderr, "exiting write process\n") ;
+					_exit(0) ; // TODO: change later
+				}//WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 				// READER does't need the output side of the pipe, so close that
 				if( close(fd[1]) == -1)
+				{
+					fprintf(stderr, "failed to close write end of pipe in reader\n") ;
 					_exit(1) ; // TODO
-
+				}
 				// READER gets stdin replaced
-				if( dup2(fd[0], 0) == -1) 
+				if( dup2(fd[0], STDIN_FILENO) == -1) 
+				{
+					fprintf(stderr, "failed to swap inputs in reader\n") ;
 					_exit(1) ; // TODO: error
+				}
 
+				fprintf(stderr, "running read command\n") ;
 				// run R
-				execute_command( c->u.command[0], profiling ) ; 
+				execute_command( c->u.command[1], profiling ) ; 
+				fprintf(stderr, "done with read command\n") ;
 
 				if( waitpid( p2, &status, 0 ) == -1) // status is p1's
 				{
+					fprintf(stderr, "error in terminating writer\n") ;
 					_exit(1) ; // TODO
 				}
 				// close R's input fd
 				if(close(fd[0]) == -1) 
+				{
+					fprintf(stderr,"failed to close read end of pipe in reader\n") ;
 					_exit(1) ; // TODO: more erroring
+				}
 
+				fprintf(stderr, "exiting read process\n") ;
 				_exit( c->u.command[1]->status ) ; // TODO: check this
-			} // if we couldn't spawn a reader, we'll have no writer, TODO: verify this is right?
+			} // if we couldn't spawn a reader, we'll have no writer, TODO: verify this is right? RRRRRRRRRRRRRR
 
 			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) )
+			{
+				fprintf(stderr, "error in terminating reader\n") ;
 				_exit(1) ;
+			}
 
+			fprintf(stderr, "finished with pipe command\n") ;
 			c->status = WEXITSTATUS(status) ;
 			break ;
 		}
@@ -130,15 +171,21 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case SIMPLE_COMMAND: {
-			printf("executed ") ;
+			char input[100];
+			if( fgets(input, 100, stdin) == NULL )
+				fprintf(stderr, "error taking in input\n") ;
+			else
+				printf("command starting with %s took in input: %s", c->u.word[0], input ) ;
+
+			fprintf(stderr, "executed  ") ;
 			int i = 0;
 			while( c->u.word[i] != NULL) 
 			{
-				printf("%s ", c->u.word[i]) ;
+				fprintf(stderr, "%s ", c->u.word[i]) ;
 				i ++ ;
 
 			}
-			printf("\n") ;
+			fprintf(stderr, "\n") ;
 			break ;
 		}
 		case SUBSHELL_COMMAND: {
