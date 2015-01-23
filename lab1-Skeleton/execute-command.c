@@ -23,6 +23,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
@@ -32,7 +35,7 @@ prepare_profiling (char const *name)
   /* FIXME: Replace this with your implementation.  You may need to
      add auxiliary functions and otherwise modify the source code.
      You can also use external functions defined in the GNU C Library.  */
-  error (0, 0, "warning: profiling not yet implemented");
+  error (0, 0, "warning: profiling not yet implemented\n");
   return -1;
 }
 
@@ -64,103 +67,66 @@ execute_command (command_t c, int profiling)
 			int status ;
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R
-			if( p1 == -1 ) 
-			{
-				fprintf(stderr, "failed to create reader\n") ;
-				_exit(1) ; // TODO: more error handling later
+			if( p1 == -1 ) {
+  				error (0, 0, "failed to create reader\n");
 			}
-			else if( p1 == 0 ) {// IN CHILD for RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
-				fprintf(stderr, "beginning reader process\n");
+			else if( p1 == 0 ) {// IN CHILD for R
 				
 				// create the pipe 
 				int fd[2] ;
-				if( pipe( fd ) == -1 )
-				{
-					fprintf(stderr, "failed to create pipe\n" ) ;
-					_exit(1) ; // TODO: more error handling later
+				if( pipe( fd ) == -1 )	{
+  					error (0, 0, "failed to create pipe\n");
 				}
 
 				//spawn a process for W
 				pid_t p2 = fork() ; 
-				if( p2 == -1 )
-				{
-					fprintf(stderr, "failed to make writer\n" ) ;
-					// if we failed to make a writer, exit the reader
-					_exit(1) ; // TODO: more erroring
+				if( p2 == -1 ) 	{
+  					error (0, 0, "failed to create writer\n");
 				}
-				else if( p2 == 0 ) { // IN CHILD for WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
-					fprintf(stderr, "beginning writer process\n") ;
+				else if( p2 == 0 ) { // IN CHILD for W
+					
 					// Writer doesn't need the input of the pipe, so close that
-					if( close(fd[0]) == -1 )
-					{
-						fprintf(stderr, "failed to close read end of pipe in writer\n" ) ;
-						_exit(1) ; // TODO
+					if( close(fd[0]) == -1 ) {
+  						error (0, 0, "failed to close input of pipe in writer\n");
 					}
 					//fprintf(stdout, "can still print to stdout?\n") ;
 
 					// WRITER turns stdout into fd[1]
-					if( dup2(fd[1], STDOUT_FILENO) == -1) 
-					{
-						fprintf(stderr, "failed to swap outputs in writer\n" ) ;
-						_exit(1) ; // TODO: error
+					if( dup2(fd[1], STDOUT_FILENO) == -1) {
+  						error (0, 0, "failed to reassign stdout in writer\n");
 					}
-					//fprintf(stdout, "can still print to stdout?\n") ;
+					
 					// run W
-					fprintf(stderr, "running writing command\n") ;
 					execute_command( c->u.command[0], profiling ) ; 
-					fprintf(stderr, "done with writing command\n") ;
 
-					// close W's output fd  // do we need to close the new stdout? prolly not?, we're exiting
-					if(close(fd[1]) == -1) 
-					{	
-						fprintf(stderr, "failed to close write end of writer\n") ; 
-						_exit(1) ; // TODO: more error
-					}
+					_exit(0) ; // TODO: change exit status later?
+				}
 
-					fprintf(stderr, "exiting write process\n") ;
-					_exit(0) ; // TODO: change later
-				}//WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 				// READER does't need the output side of the pipe, so close that
-				if( close(fd[1]) == -1)
-				{
-					fprintf(stderr, "failed to close write end of pipe in reader\n") ;
-					_exit(1) ; // TODO
-				}
-				// READER gets stdin replaced
-				if( dup2(fd[0], STDIN_FILENO) == -1) 
-				{
-					fprintf(stderr, "failed to swap inputs in reader\n") ;
-					_exit(1) ; // TODO: error
+				if( close(fd[1]) == -1)	{
+  					error (0, 0, "failed to close write end of pipe in reader\n");
 				}
 
-				fprintf(stderr, "running read command\n") ;
+				// READER gets stdin replaced
+				if( dup2(fd[0], STDIN_FILENO) == -1) {
+  					error (0, 0, "failed to swap inputs in reader\n");
+				}
+
 				// run R
 				execute_command( c->u.command[1], profiling ) ; 
-				fprintf(stderr, "done with read command\n") ;
 
-				if( waitpid( p2, &status, 0 ) == -1) // status is p1's
-				{
-					fprintf(stderr, "error in terminating writer\n") ;
-					_exit(1) ; // TODO
+				if( waitpid( p2, &status, 0 ) == -1) { // status is p1's
+  					error (0, 0, "error in terminating writer\n");
 				}
-				// close R's input fd
-				if(close(fd[0]) == -1) 
-				{
-					fprintf(stderr,"failed to close read end of pipe in reader\n") ;
-					_exit(1) ; // TODO: more erroring
-				}
-
-				fprintf(stderr, "exiting read process\n") ;
+				
+				//fd[0] and the new STDIN_FILENO are closed at exit
 				_exit( c->u.command[1]->status ) ; // TODO: check this
-			} // if we couldn't spawn a reader, we'll have no writer, TODO: verify this is right? RRRRRRRRRRRRRR
+			} // if we couldn't spawn a reader, we'll have no writer
 
-			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) )
-			{
-				fprintf(stderr, "error in terminating reader\n") ;
-				_exit(1) ;
+			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) ) {
+  				error (0, 0, "Reader terminated with error\n");
 			}
 
-			fprintf(stderr, "finished with pipe command\n") ;
 			c->status = WEXITSTATUS(status) ;
 			break ;
 		}
@@ -171,22 +137,38 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case SIMPLE_COMMAND: {
-			char input[100];
-			if( fgets(input, 100, stdin) == NULL )
-				fprintf(stderr, "error taking in input\n") ;
-			else
-				printf("command starting with %s took in input: %s", c->u.word[0], input ) ;
-
-			fprintf(stderr, "executed  ") ;
-			int i = 0;
-			while( c->u.word[i] != NULL) 
-			{
-				fprintf(stderr, "%s ", c->u.word[i]) ;
-				i ++ ;
-
-			}
-			fprintf(stderr, "\n") ;
-			break ;
+		  FILE* inf;
+		  FILE* outf;
+		  int in,out;
+		  pid_t pid = fork();
+		  if(pid < 0) error(3, 0, "Failure to fork process");
+		  else if (pid == 0){ //CHILD
+		    if(c->input != NULL){
+		      inf = fopen(c->input, "r");
+		      in = fileno(inf);
+		      if(in == -1) error(12, 0, "Couldn't open input");
+		      if(dup2(in,0) < 0) error(13, 0, "Couldn't set STDIN");
+		    }
+		    if(c->output != NULL){
+		      outf = fopen(c->output, "w");
+		      out = fileno(outf);
+		      if(out == -1) error(14, 0, "Couldn't open output");
+		      if(dup2(out,1) < 0) error(15, 0, "Couldn't set STDOUT");
+		    }
+		    //printf("%s\n", (c->u.word+1)[0]); printsout the word properly...
+		    execvp(c->u.word[0], c->u.word);  //let it be known that I am an idiot. The first element of the argument array is the command itself. anything else will result in errors
+		    error(5, 0, "%s: command not found\n", c->u.word[0]);
+		  }
+		  int status;
+		  pid_t returned = waitpid(pid, &status, 0);
+		  if(returned < 0 || !WIFEXITED(status))
+		    error(6, 0, "Process failed to return");
+		  //some stuff to process the status
+		  
+		  c->status = WEXITSTATUS(status);
+		  
+		  break ;
+		  
 		}
 		case SUBSHELL_COMMAND: {
 			int status ;

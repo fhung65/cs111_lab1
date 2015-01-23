@@ -22,6 +22,7 @@
 #include <stdio.h>
 
 #include "command.h"
+#include "command-internals.h"
 
 static char const *program_name;
 static char const *script_name;
@@ -89,7 +90,8 @@ main (int argc, char **argv)
 		}
 	  else
 		{
-		//  execute_command (command, profiling);
+		  execute_command (command, profiling);
+		  printf("\texited with %i\n", command->status) ;
 		}
     }
 	free_command_tree( last_command ) ;
