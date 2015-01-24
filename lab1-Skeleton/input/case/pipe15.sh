@@ -4,7 +4,8 @@ fi |
 if test 1 -eq 4
 then echo naaay
 else cat
-fi |
+fi | 
 if test 1 -eq 5
 then echo naaah
-else cat
+else cat 
+fi

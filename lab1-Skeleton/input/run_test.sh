@@ -1,7 +1,8 @@
 #!/bin/bash
-for each in `ls test | grep .*sh` 
+for each in `ls case | grep .*sh` 
 do
 	echo $each
-	../profsh "test/$each"
+	../profsh "case/$each"
 done
 mv *.out out
+rm *.tmp

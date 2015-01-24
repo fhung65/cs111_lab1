@@ -1,1 +1,1 @@
-(ls | grep sh ) grep s
+(ls | grep sh ) | grep s 
