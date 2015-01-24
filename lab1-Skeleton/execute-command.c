@@ -83,7 +83,7 @@ execute_command (command_t c, int profiling)
 			pid_t p = fork();
 			setup_io(c);
 			if( p == -1 )
-				error(0 , 0 , "failed to create new process\n");
+				error(1 , 0 , "failed to create new process\n");
 			else if( p == 0 ) // Kiddy land!
 			{
 				setup_io( c ) ;
@@ -102,9 +102,8 @@ execute_command (command_t c, int profiling)
 			}
 			// parent's land!
 			if( waitpid( p, &status, 0 ) == -1 || !WIFEXITED(status)) 
-			{
-  				error (0, 0, "Subshell command terminated with error\n");
-			}
+  				error (1, 0, "Subshell command terminated with error\n");
+			
 			c->status = WEXITSTATUS(status) ;
 			break ;
 		}
@@ -119,39 +118,30 @@ execute_command (command_t c, int profiling)
 			int status ;
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R
-			if( p1 == -1 ) {
-  				error (0, 0, "failed to create reader\n");
-			}
-			else if( p1 == 0 ) {// IN CHILD for R
+			if( p1 == -1 ) 
+  				error (1, 0, "failed to create reader\n");
+			else if( p1 == 0 ) 
+			{// IN CHILD for R
 				
 				// create the pipe 
 				int fd[2] ;
 				if( pipe( fd ) == -1 )	
-				{
-  					error (0, 0, "failed to create pipe\n");
-				}
+  					error (1, 0, "failed to create pipe\n");
 
 				//spawn a process for W
 				pid_t p2 = fork() ; 
 				if( p2 == -1 ) 	
-				{
-  					error (0, 0, "failed to create writer\n");
-				}
+  					error (1, 0, "failed to create writer\n");
 				else if( p2 == 0 ) 
 				{ // IN CHILD for W
 					
 					// Writer doesn't need the input of the pipe, so close that
 					if( close(fd[0]) == -1 ) 
-					{
-  						error (0, 0, "failed to close input of pipe in writer\n");
-					}
-					//fprintf(stdout, "can still print to stdout?\n") ;
+  						error (1, 0, "failed to close input of pipe in writer\n");
 
 					// WRITER turns stdout into fd[1]
 					if( dup2(fd[1], STDOUT_FILENO) == -1) 
-					{
-  						error (0, 0, "failed to reassign stdout in writer\n");
-					}
+  						error (1, 0, "failed to reassign stdout in writer\n");
 					
 					// run W
 					execute_command( c->u.command[0], profiling ) ; 
@@ -161,32 +151,24 @@ execute_command (command_t c, int profiling)
 
 				// READER does't need the output side of the pipe, so close that
 				if( close(fd[1]) == -1)	
-				{
-  					error (0, 0, "failed to close write end of pipe in reader\n");
-				}
+  					error (1, 0, "failed to close write end of pipe in reader\n");
 
 				// READER gets stdin replaced
 				if( dup2(fd[0], STDIN_FILENO) == -1) 
-				{
-  					error (0, 0, "failed to swap inputs in reader\n");
-				}
+  					error (1, 0, "failed to swap inputs in reader\n");
 
 				// run R
 				execute_command( c->u.command[1], profiling ) ; 
 
 				if( waitpid( p2, &status, 0 ) == -1) 
-				{ // status is p1's
-  					error (0, 0, "error in terminating writer\n");
-				}
+  					error (1, 0, "error in terminating writer\n");
 				
 				//fd[0] and the new STDIN_FILENO are closed at exit
 				_exit( c->u.command[1]->status ) ; // TODO: check this
 			} // if we couldn't spawn a reader, we'll have no writer
 
 			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) ) 
-			{
-  				error (0, 0, "Reader terminated with error\n");
-			}
+  				error (1, 0, "Reader terminated with error\n");
 
 			c->status = WEXITSTATUS(status) ;
 			break ;
@@ -204,19 +186,6 @@ execute_command (command_t c, int profiling)
 		  if(pid < 0) error(3, 0, "Failure to fork process");
 		  else if (pid == 0){ //CHILD
 		  	setup_io( c );
-		    //if(c->input != NULL){
-		    //  in = open(c->input, O_RDONLY);
-		    //  if(in == -1) error(12, 0, "Couldn't open input");
-		    //  if(dup2(in,0) < 0) error(13, 0, "Couldn't set STDIN");
-		    //}
-		    //if(c->output != NULL){
-		    //  out = open(c->output, O_WRONLY | O_CREAT | O_TRUNC,
-			//	 S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP |
-			//	 S_IROTH | S_IWOTH);
-		    //  if(out == -1) error(14, 0, "Couldn't open output");
-		    //  if(dup2(out,1) < 0) error(15, 0, "Couldn't set STDOUT");
-		    //}
-		    //printf("%s\n", (c->u.word+1)[0]); printsout the word properly...
 		    execvp(c->u.word[0], c->u.word);  //let it be known that I am an idiot. The first element of the argument array is the command itself. anything else will result in errors
 		    error(5, 0, "%s: command not found\n", c->u.word[0]);
 		  }
@@ -237,7 +206,7 @@ execute_command (command_t c, int profiling)
 			pid_t p = fork() ;
 			if(p == -1) 
 			{
-				// handle error
+  				error (1, 0, "failed to spawn subshell\n");
 			}
 			else if(p == 0) // kiddy land!
 			{
@@ -248,7 +217,7 @@ execute_command (command_t c, int profiling)
 			// parent's land!
 			if( waitpid( p, &status, 0 ) == -1 || !WIFEXITED(status)) 
 			{
-  				error (0, 0, "Subshell command terminated with error\n");
+  				error (1, 0, "Subshell command terminated with error\n");
 			}
 			c->status = WEXITSTATUS(status) ;
 			
@@ -259,7 +228,7 @@ execute_command (command_t c, int profiling)
 			int status;
 			pid_t p = fork();
 			if( p == -1 )
-				error( 0, 0, "failed to create process\n");
+				error( 1, 0, "failed to create process\n");
 			else if( p == 0 ) // Kiddy land!
 			{
 				setup_io( c ) ;
@@ -273,7 +242,7 @@ execute_command (command_t c, int profiling)
 			// parent land! wait for your kids, then set your status or cry
 			if( waitpid( p , &status , 0 ) == -1 || !WIFEXITED(status) ) 
 			{
-  				error (0, 0, "Until command terminated with error\n");
+  				error (1, 0, "Until command terminated with error\n");
 			}
 
 			c->status = WEXITSTATUS(status) ;
@@ -285,7 +254,7 @@ execute_command (command_t c, int profiling)
 			pid_t p = fork() ;
 			
 			if( p == -1)
-				error( 0, 0, "falied to create process\n") ;
+				error( 1, 0, "falied to create process\n") ;
 			else if( p == 0 ) // Kiddy land!
 			{
 				setup_io( c ) ;
@@ -300,7 +269,7 @@ execute_command (command_t c, int profiling)
 			// parent land! wait for your kids, then set your status or cry
 			if( waitpid( p , &status , 0 ) == -1 || !WIFEXITED(status) ) 
 			{
-  				error (0, 0, "While command terminated with error\n");
+  				error (1, 0, "While command terminated with error\n");
 			}
 			c->status = WEXITSTATUS(status) ;
 
