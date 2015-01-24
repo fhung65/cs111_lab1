@@ -100,7 +100,7 @@ make_command_stream (int (*get_next_byte) (void *),
 				token = (char*) malloc(max_size*sizeof(char*));
 				tstart = 1;
 			}
-			while(c != '\n' || c == EOF ){
+			while(c != '\n' && c != EOF ){
 				c = get_next_byte(get_next_byte_argument);
 			} 
 			continue; // c is replaced at the end, so continue skips
@@ -408,7 +408,27 @@ read_command_stream (command_stream_t s)
 				exit(1) ;
 			}
 		}
-		else if( !strcmp(token, ";") || !strcmp(token, "|") )
+		else if( !strcmp( token, "|" )  )
+		{
+			if( base[scope] == NULL )
+			{
+				fprintf(stderr, "Invalid syntax: unexpected token near %s\n", token) ;
+				exit(1) ;
+			}
+
+			if( scope > 0 && base[scope-1]->type == PIPE_COMMAND)
+			{
+				pop_base( base, &scope) ;
+			}
+			
+			command_t cmd = new_command(PIPE_COMMAND) ;
+			cmd->u.command[0] = base[scope] ;
+			base[scope] = cmd ;
+			push_base( NULL, &base, &scope, &size ) ;
+			continue ;
+			
+		}
+		else if( !strcmp(token, ";") )//|| !strcmp(token, "|") )
 		{
 			if( base[scope] == NULL )
 			{
@@ -417,15 +437,16 @@ read_command_stream (command_stream_t s)
 			}
 
 			if( scope > 0  
-				&& ( base[scope-1]->type == SEQUENCE_COMMAND 
+				&& ( ( base[scope-1]->type == SEQUENCE_COMMAND ) //&& strcmp(token, "|") )
 					|| base[scope-1]->type == PIPE_COMMAND ) )
 			{	
 				pop_base( base, &scope ) ;// should put complete cmd in base[scope-1]
 			} 							
 
-			enum command_type t = (!strcmp(token, ";"))? 
-				SEQUENCE_COMMAND : PIPE_COMMAND ;
-			command_t cmd = new_command( t ) ;
+			//enum command_type t = (!strcmp(token, ";"))? 
+			//	SEQUENCE_COMMAND : PIPE_COMMAND ;
+			//command_t cmd = new_command( t ) ;
+			command_t cmd = new_command( SEQUENCE_COMMAND ) ;
 			cmd->u.command[0] = base[scope] ; //stick complete cmd under this new one
 			base[scope] = cmd ; // stick in this new one as the top of the subtree
 			//push_base( cmd, &base, scope, size ) ; // erroneous
@@ -437,6 +458,7 @@ read_command_stream (command_stream_t s)
 			s->line_num ++ ;
 			if(	( ( scope == 0 && base[scope] != NULL) 
 					||  (scope == 1 && base[0]->type == SEQUENCE_COMMAND) 
+					//|| 	(scope == 2 && base[1]->type == PIPE_COMMAND && base[0]->type == SEQUENCE_COMMAND )
 					||  (	(scope == 1 && base[0]->type == PIPE_COMMAND)
 							&&(base[0]->u.command[0] != NULL) ) )
 				&&( s->div < s->size - 1 ) 
@@ -554,25 +576,36 @@ read_command_stream (command_stream_t s)
 	// done making command now, or reached end of stream
 	if( scope >= 1 )
 	{
-		if( scope == 1 && ( ( base[0]->type == SEQUENCE_COMMAND ) 
-					|| ( base[0]->type == PIPE_COMMAND && base[1] != NULL) ) ) 
+		if( scope <= 2 && (base[0]->type == SEQUENCE_COMMAND || base[0]->type == PIPE_COMMAND)
+			&& ( ( base[scope-1]->type == SEQUENCE_COMMAND ) 
+				|| ( base[scope-1]->type == PIPE_COMMAND && base[scope] != NULL) ) ) 
 		{
 			pop_base( base, &scope ) ; // it's ok to pop a null
 		//	printf( "returned base[scope] = %d\n" , base[scope]->type ) ;
-		
-			if( base[0]->u.command[1] == NULL ) 
-			{
-				command_t retval = base[0]->u.command[0] ;
-				free( base[0] ) ;
-				free( base ) ;
-				return retval ;
+
+			// there could be a sequence on top that a null got popped into
+			if( base[scope]->type == SEQUENCE_COMMAND && base[scope]->u.command[1] == NULL )
+			{	
+				command_t temp = base[scope]->u.command[0] ;
+				free( base[scope] ) ;
+				base[scope] = temp ;
 			}
-			else
-			{
+			if( scope != 0 )
+				pop_base( base, &scope ) ;
+
+		//	if( base[0]->u.command[1] == NULL ) 
+		//	{
+		//		command_t retval = base[0]->u.command[0] ;
+		//		free( base[0] ) ;
+		//		free( base ) ;
+		//		return retval ;
+		//	}
+			//else
+			//{
 				command_t retval = base[0] ;
 				free( base );
 				return retval  ;
-			}
+			//}
 			//good to go
 		}
 		else
@@ -645,7 +678,7 @@ void free_command_tree( command_t tree )
 //	printf("freed: %s\n" , (tree == NULL)? "NULL" 
 //				: (tree->type == IF_COMMAND)? "IF" 
 //				: (tree->type == PIPE_COMMAND)? "PIPE"
-//				: (tree->type == SEQUENCE_COMMAND)? "SEQUENCE?"
+//				: (tree->type == SEQUENCE_COMMAND)? "SEQUENCE"
 //				: (tree->type == SIMPLE_COMMAND)? "SIMPLE"
 //				: (tree->type == SUBSHELL_COMMAND)? "SUBSHELL"
 //				: (tree->type == UNTIL_COMMAND)? "UNTIL"
