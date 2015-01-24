@@ -99,7 +99,13 @@ execute_command (command_t c, int profiling)
 			}
 			break ;
 		case PIPE_COMMAND: { // W | R 
-			setup_io( c ) ;
+			if(c->input != NULL)
+				if( c->u.command[0]->input == NULL)
+					c->u.command[0]->input = c->input ;
+			if(c->output != NULL)
+				if( c->u.command[1]->output == NULL)
+					c->u.command[1]->output = c->output ;
+			
 			int status ;
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R

@@ -91,7 +91,7 @@ main (int argc, char **argv)
 	  else
 		{
 		  execute_command (command, profiling);
-		  printf("\texited with %i\n", command->status) ;
+		  printf("%i\n", command->status) ;
 		}
     }
 	free_command_tree( last_command ) ;

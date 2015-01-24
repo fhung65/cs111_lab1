@@ -1,0 +1,1 @@
+(echo haldo) | cat
