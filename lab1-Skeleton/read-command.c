@@ -486,7 +486,7 @@ read_command_stream (command_stream_t s)
 		else if( !strcmp( token, "<" ) || !strcmp( token,">") ) 
 		{
 			int in = (!strcmp(token, "<"))? 1 : 0 ; // 1 => In // 0 => Out
-			if( ( base[scope] != NULL ) 
+			if( ( base[scope] != NULL ) // if top of base is null, not pipe or seq?
  				&&  ( ( in && ( base[scope]->input == NULL ) ) 
 					  || ( (!in) && ( base[scope]->output == NULL ) ) ) )
 			{

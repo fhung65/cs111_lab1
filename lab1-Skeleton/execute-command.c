@@ -45,12 +45,47 @@ command_status (command_t c)
   return c->status;
 }
 
+
+// called by conditionals
+// sets io of subcommands of c to c's io
+// for subcommands with no io already specified
+// so priority is given to closest io
+// doesn't mess with file descriptors
+void
+setup_io( command_t c ) // called by conditionals and compounds and subshells
+{
+	// we don't wanna waste time if this setup will have no effect
+	// ie, not one of the below commands
+	//if(  c->type != IF_COMMAND &&
+	//	 c->type != WHILE_COMMAND && 
+	//	 c->type != UNTIL_COMMAND && 
+	//	 c->type != SUBSHELL_COMMAND )
+	//	return ;
+
+	int i;
+	if( c->input != NULL )
+	{
+		for(i = 0 ; i < 3 ; i++)
+			if(c->u.command[i] != NULL && c->u.command[i]->input == NULL)
+				c->u.command[i]->input = c->input ;
+	}
+	
+	if( c->output != NULL )
+	{
+		for(i = 0 ; i < 3 ; i++)
+			if(c->u.command[i] != NULL && c->u.command[i]->output == NULL)
+				c->u.command[i]->output = c->output ;
+	}
+}
+
+
 void
 execute_command (command_t c, int profiling)
 {
 	switch( c->type )
 	{
 		case IF_COMMAND:
+			setup_io( c ) ;
 			execute_command( c->u.command[0], profiling ) ;
 			if( c->u.command[0]->status == 0 ) 
 			{
@@ -64,6 +99,7 @@ execute_command (command_t c, int profiling)
 			}
 			break ;
 		case PIPE_COMMAND: { // W | R 
+			setup_io( c ) ;
 			int status ;
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R
@@ -131,6 +167,7 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case SEQUENCE_COMMAND: {
+			setup_io( c ) ;
 			execute_command(c->u.command[0], profiling) ;
 			execute_command(c->u.command[1], profiling) ;
 			c->status = (c->u.command[1]->status) ;
@@ -169,6 +206,7 @@ execute_command (command_t c, int profiling)
 		  
 		}
 		case SUBSHELL_COMMAND: {
+			setup_io( c ) ;
 			int status ;
 			pid_t retval ;
 			pid_t p = fork() ;
@@ -191,6 +229,7 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case UNTIL_COMMAND: {
+			setup_io( c ) ;
 			do{
 				execute_command(c->u.command[1], profiling) ;
 				execute_command(c->u.command[0], profiling) ;
@@ -199,6 +238,7 @@ execute_command (command_t c, int profiling)
 			break ;
 		}
 		case WHILE_COMMAND: {
+			setup_io( c ) ;
 			execute_command( c->u.command[0], profiling ) ;
 			while( c->u.command[0]->status == 0 )
 			{
