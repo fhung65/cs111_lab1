@@ -81,7 +81,6 @@ execute_command (command_t c, int profiling)
 		{
 			int status ;
 			pid_t p = fork();
-			setup_io(c);
 			if( p == -1 )
 				error(1 , 0 , "failed to create new process\n");
 			else if( p == 0 ) // Kiddy land!
@@ -235,7 +234,7 @@ execute_command (command_t c, int profiling)
 				do{
 					execute_command(c->u.command[1], profiling) ;
 					execute_command(c->u.command[0], profiling) ;
-				} while ( c->u.command[0]->status == 0 ) ;
+				} while ( c->u.command[0]->status != 0 ) ;
 				_exit( c->u.command[1]->status );
 			}
 			

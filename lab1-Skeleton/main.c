@@ -20,6 +20,9 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "command.h"
 #include "command-internals.h"
@@ -94,7 +97,8 @@ main (int argc, char **argv)
 		  //printf("%i\n", command->status) ;
 		}
     }
+	int retval = print_tree || !last_command ? 0 : command_status (last_command);
 	free_command_tree( last_command ) ;
 	free_command_stream( command_stream ) ;
-  return print_tree || !last_command ? 0 : command_status (last_command);
+	return retval ;
 }

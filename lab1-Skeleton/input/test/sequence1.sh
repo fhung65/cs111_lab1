@@ -1,2 +1,0 @@
-echo bobby
-echo yes

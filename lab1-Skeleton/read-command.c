@@ -458,7 +458,7 @@ read_command_stream (command_stream_t s)
 			s->line_num ++ ;
 			if(	( ( scope == 0 && base[scope] != NULL) 
 					||  (scope == 1 && base[0]->type == SEQUENCE_COMMAND) 
-					//|| 	(scope == 2 && base[1]->type == PIPE_COMMAND && base[0]->type == SEQUENCE_COMMAND )
+					|| 	(scope == 2 && base[1]->type == PIPE_COMMAND && base[0]->type == SEQUENCE_COMMAND )
 					||  (	(scope == 1 && base[0]->type == PIPE_COMMAND)
 							&&(base[0]->u.command[0] != NULL) ) )
 				&&( s->div < s->size - 1 ) 

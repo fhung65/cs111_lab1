@@ -1,0 +1,4 @@
+../profsh: cta: command not found
+
+cat: 2.out: input file is output file
+cat: tempfile: No such file or directory
