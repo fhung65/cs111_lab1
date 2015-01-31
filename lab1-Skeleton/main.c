@@ -23,6 +23,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "command.h"
 #include "command-internals.h"
@@ -45,6 +46,9 @@ get_next_byte (void *stream)
 int
 main (int argc, char **argv)
 {
+  struct timespec start;
+  clock_gettime(CLOCK_MONOTONIC, &start) ;
+
   int command_number = 1;
   bool print_tree = false;
   char const *profile_name = 0;
@@ -77,6 +81,9 @@ main (int argc, char **argv)
     {
       profiling = prepare_profiling (profile_name);
       if (profiling < 0)
+	  // TODO: this call to error needs to be removed, the shell should run anyways
+	  // 		instead, we should probably set up an error code 
+	  //
 	error (1, errno, "%s: cannot open", profile_name);
     }
 
@@ -93,12 +100,14 @@ main (int argc, char **argv)
 		}
 	  else
 		{
-		  execute_command (command, profiling);
+		  execute_command (command, &profiling);
 		  //printf("%i\n", command->status) ;
 		}
     }
 	int retval = print_tree || !last_command ? 0 : command_status (last_command);
 	free_command_tree( last_command ) ;
 	free_command_stream( command_stream ) ;
+
+	tlog( profiling,  &start, NULL, getpid() );
 	return retval ;
 }

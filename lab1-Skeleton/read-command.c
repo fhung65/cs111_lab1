@@ -40,7 +40,7 @@ struct command_stream
 	char** tok ; // and array of tokens (c strings)
 };
 
-typedef struct command_stream *command_stream_t;
+//typedef struct command_stream *command_stream_t;
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),

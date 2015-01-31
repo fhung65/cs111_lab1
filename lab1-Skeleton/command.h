@@ -14,6 +14,7 @@
 
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#include <sys/types.h>
 
 typedef struct command *command_t;
 typedef struct command_stream *command_stream_t;
@@ -43,7 +44,10 @@ void print_command (command_t);
 
 /* Execute a command.  Use profiling according to the flag; do not profile
    if the flag is negative.  */
-void execute_command (command_t, int);
+void execute_command (command_t, int*);
+
+/* Writes log info to the file descriptor specified by fd*/
+int tlog( int fd, struct timespec* start, command_t cmd, pid_t p) ;
 
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */

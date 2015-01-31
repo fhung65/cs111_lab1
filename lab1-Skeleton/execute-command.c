@@ -25,19 +25,25 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
+// I think ret -1 on file fail, otherwise fd of log file
+// will be called by main to open/create a file
+// or should we just create the file, and have processes use open to
+// write to it, with exclusive flags? I like this second one better
+
 int
 prepare_profiling (char const *name)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
-  error (0, 0, "warning: profiling not yet implemented\n");
-  return -1;
+  return open( name, O_WRONLY | O_APPEND | O_CREAT,0666 ) ;
 }
+
 
 int
 command_status (command_t c)
@@ -72,14 +78,103 @@ setup_io( command_t c ) // called by conditionals and compounds and subshells
 	}
 }
 
+// things to consider: 
+// 		exiting mid execution
+//			exit in main/ read-command: hmm...
+//			exit in execute command -> 
+//				parent: 'tis fine?, why not record time values anyways
+//				child: hmm, 
+// returns -1 on fail, 0 on success
+int tlog( int fd, struct timespec* start, command_t cmd, pid_t p)
+{	
+	if(fd == -1) //not most accurrate time reading if this is here 
+		return -1 ;
+
+	struct timespec abs;
+	struct timespec end;
+	struct timespec resa ;
+	struct timespec resb ;
+	struct rusage use;
+	struct flock fl ;
+	fl.l_type =  F_WRLCK;
+	fl.l_whence = SEEK_SET ;
+	fl.l_start = 0 ;
+	fl.l_len = 0 ;
+	
+	if( clock_gettime(CLOCK_REALTIME, &abs) == -1 )
+		return -1 ;
+	if( clock_gettime(CLOCK_MONOTONIC, &end) == -1 )
+		return -1 ;
+	if( getrusage(RUSAGE_CHILDREN, &use ) == -1 ) 
+		return -1 ;
+	if( clock_getres(CLOCK_REALTIME, &resa) == -1 )
+		return -1 ;
+	if( clock_getres(CLOCK_MONOTONIC, &resb) == -1 )
+		return -1 ;
+
+	if( fcntl( fd, F_SETLKW, &fl ) == -1 )
+		return -1 ;
+	
+	long a_nsec = abs.tv_nsec - (abs.tv_nsec % resa.tv_nsec) ;
+	long e_nsec = end.tv_nsec - (end.tv_nsec % resb.tv_nsec) ;
+	long s_nsec = start->tv_nsec - (start->tv_nsec % resb.tv_nsec) ;
+	long cmd_sec = end.tv_sec - start->tv_sec ;
+	long cmd_nsec;
+	if(e_nsec > s_nsec)
+		cmd_nsec = (e_nsec - s_nsec); 
+	else
+	{
+		cmd_sec-- ;
+		cmd_nsec = 1000000000 - (s_nsec - e_nsec) ;
+	}
+
+	dprintf(fd, "%li.%09li %li.%09li %li.%06li %li.%06li",
+			abs.tv_sec, a_nsec,
+			end.tv_sec - start->tv_sec, cmd_nsec,
+			use.ru_utime.tv_sec, use.ru_utime.tv_usec,
+			use.ru_stime.tv_sec, use.ru_stime.tv_usec ) ;
+	
+	if( cmd != NULL )
+	{
+		int i = 0;
+		while( cmd->u.word[i] != NULL )
+		{
+			if( strcmp(cmd->u.word[i], "\n") )
+				dprintf(fd, " %s", cmd->u.word[i] ) ;
+			i++ ;
+		}
+	}
+	else if( p > 0 )
+	{
+		dprintf(fd, " [%d]", p ) ;
+	}
+
+	dprintf(fd, "\n") ;
+
+	fl.l_type = F_UNLCK ;
+	if( fcntl( fd, F_SETLK, &fl ) == -1 )
+		return -1 ;
+
+	return 0 ;
+}
+
+//
+//		do nothing if profiling == -1 => can probably leave this to log()
+//		right before each fork, get a start time,
+//		at the end of each, call log()
 void
-execute_command (command_t c, int profiling)
+execute_command (command_t c, int* profiling)
 {
 	switch( c->type )
 	{
 		case IF_COMMAND:
 		{
 			int status ;
+			struct timespec start ;
+			if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &start) == -1 )
+					*profiling = -1 ;
+
 			pid_t p = fork();
 			if( p == -1 )
 				error(1 , 0 , "failed to create new process\n");
@@ -102,7 +197,11 @@ execute_command (command_t c, int profiling)
 			// parent's land!
 			if( waitpid( p, &status, 0 ) == -1 || !WIFEXITED(status)) 
   				error (1, 0, "Subshell command terminated with error\n");
-			
+
+			if( *profiling != -1)
+				if ( tlog( *profiling, &start, NULL, p ) == -1 ) 
+					*profiling = -1 ; // log the process
+
 			c->status = WEXITSTATUS(status) ;
 			break ;
 		}
@@ -115,6 +214,10 @@ execute_command (command_t c, int profiling)
 					c->u.command[1]->output = c->output ;
 			
 			int status ;
+			struct timespec startA ;
+			if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &startA ) == -1 )
+					*profiling = -1 ;
 
 			pid_t p1 = fork() ; // FORK A CHILD FOR R
 			if( p1 == -1 ) 
@@ -126,6 +229,12 @@ execute_command (command_t c, int profiling)
 				int fd[2] ;
 				if( pipe( fd ) == -1 )	
   					error (1, 0, "failed to create pipe\n");
+
+				
+				struct timespec startB ;
+				if( *profiling != -1) // grab the start time
+					if( clock_gettime(CLOCK_MONOTONIC, &startB) == -1 )
+						*profiling = -1 ;
 
 				//spawn a process for W
 				pid_t p2 = fork() ; 
@@ -161,6 +270,10 @@ execute_command (command_t c, int profiling)
 
 				if( waitpid( p2, &status, 0 ) == -1) 
   					error (1, 0, "error in terminating writer\n");
+			
+				if( *profiling != -1)
+					if ( tlog( *profiling, &startB, NULL, p2 ) == -1 ) 
+						*profiling = -1 ; // log the process
 				
 				//fd[0] and the new STDIN_FILENO are closed at exit
 				_exit( c->u.command[1]->status ) ; // TODO: check this
@@ -168,6 +281,10 @@ execute_command (command_t c, int profiling)
 
 			if( waitpid( p1 , &status , 0 ) == -1 || !WIFEXITED(status) ) 
   				error (1, 0, "Reader terminated with error\n");
+			
+			if( *profiling != -1 )
+				if( tlog( *profiling, &startA, NULL, p1 ) == -1 ) 
+					*profiling = -1 ; // log the process
 
 			c->status = WEXITSTATUS(status) ;
 			break ;
@@ -181,15 +298,33 @@ execute_command (command_t c, int profiling)
 		}
 		case SIMPLE_COMMAND: {
 		 // int in,out;
-		  pid_t pid = fork();
+		  int is_exec = !strcmp(c->u.word[0], "exec") ;
+		  char** word_arr = c->u.word;
+		  struct timespec start ;
+		  pid_t pid ;
+		  if( !is_exec ) // don't fork for exec
+		  {
+		  	if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &start) == -1 )
+					*profiling = -1 ;
+		  	pid = fork();
+		  }
+		  else
+		  	word_arr ++;
 		  if(pid < 0) error(3, 0, "Failure to fork process");
-		  else if (pid == 0){ //CHILD
+		  else if (pid == 0 || is_exec){ //CHILD or exec
 		  	setup_io( c );
-		    execvp(c->u.word[0], c->u.word);  //let it be known that I am an idiot. The first element of the argument array is the command itself. anything else will result in errors
+		    execvp(word_arr[0], word_arr);  //let it be known that I am an idiot. The first element of the argument array is the command itself. anything else will result in errors
 		    error(5, 0, "%s: command not found\n", c->u.word[0]);
 		  }
 		  int status;
+		  // kinda janky, but in the special case of exec, this wait isn't called
 		  pid_t returned = waitpid(pid, &status, 0);
+		  
+		  if( *profiling != -1)// log the process
+				if ( tlog( *profiling, &start, c, -1 ) == -1 ) 
+					*profiling = -1 ; 
+		  
 		  if(returned < 0 || !WIFEXITED(status))
 		    error(6, 0, "Process failed to return");
 		  //some stuff to process the status
@@ -202,6 +337,10 @@ execute_command (command_t c, int profiling)
 		case SUBSHELL_COMMAND: 
 		{
 			int status ;
+			struct timespec start ;
+			if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &start) == -1 )
+					*profiling = -1 ;
 			pid_t p = fork() ;
 			if(p == -1) 
 			{
@@ -218,13 +357,23 @@ execute_command (command_t c, int profiling)
 			{
   				error (1, 0, "Subshell command terminated with error\n");
 			}
+			
+			if( *profiling != -1)
+				if ( tlog( *profiling, &start, NULL, p ) == -1 ) 
+					*profiling = -1 ; // log the process
+			
 			c->status = WEXITSTATUS(status) ;
 			
 			break ;
 		}
 		case UNTIL_COMMAND: 
 		{
-			int status;
+			int status ;
+			struct timespec start ;
+			if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &start) == -1 )
+					*profiling = -1 ;
+			
 			pid_t p = fork();
 			if( p == -1 )
 				error( 1, 0, "failed to create process\n");
@@ -244,12 +393,22 @@ execute_command (command_t c, int profiling)
   				error (1, 0, "Until command terminated with error\n");
 			}
 
+			if( *profiling != -1)
+				if ( tlog( *profiling, &start, NULL, p ) == -1 ) 
+					*profiling = -1 ; // log the process
+
 			c->status = WEXITSTATUS(status) ;
 			break ;
 		}
 		case WHILE_COMMAND: 
 		{
 			int status ;
+			struct timespec start ;
+			
+			if( *profiling != -1) // grab the start time
+				if( clock_gettime(CLOCK_MONOTONIC, &start) == -1 )
+					*profiling = -1 ;
+			
 			pid_t p = fork() ;
 			
 			if( p == -1)
@@ -270,6 +429,11 @@ execute_command (command_t c, int profiling)
 			{
   				error (1, 0, "While command terminated with error\n");
 			}
+
+			if( *profiling != -1)
+				if ( tlog( *profiling, &start, NULL, p ) == -1 ) 
+					*profiling = -1 ; // log the process
+			
 			c->status = WEXITSTATUS(status) ;
 
 			break ;
